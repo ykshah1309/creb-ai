@@ -1,0 +1,12 @@
+# Ignore frontend + Python cruft
+node_modules/
+.env
+__pycache__/
+client/build/
+server/venv/
+node_modules
+.next
+.env.local
+.env
+.DS_Store
+out
