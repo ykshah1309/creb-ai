@@ -2,7 +2,9 @@
 
 **CREB.Ai** is the first Tinder-style, AI-driven web platform for Commercial Real Estate (CRE). We make it effortless for buyers, sellers, and brokers to connect, negotiate, and close CRE deals—faster and smarter than ever.
 
-![Demo Video Link]()
+![User-Side Demo Video Link](https://drive.google.com/file/d/1bZ9EH54e9UQ8XkcSmhKRtkgeRvQE8mDb/view?usp=sharing)
+
+![Admin-Side Demo Video Link](https://drive.google.com/file/d/1jqdzbQGxXbpMcHkCGqiFTaHasMMw2xJ6/view?usp=sharing)
 
 ---
 

@@ -46,7 +46,18 @@ export default function AuthPage() {
         duration: 2000,
         isClosable: true,
       });
-      setTimeout(() => router.push("/dashboard"), 1000);
+
+      // --- ADD THIS BLOCK: Fetch latest user and redirect accordingly
+      setTimeout(async () => {
+        const { data: userData } = await supabase.auth.getUser();
+        const loggedInEmail = userData?.user?.email || email;
+        if (loggedInEmail === "admin@example.com") {
+          router.push("/admin-dashboard");
+        } else {
+          router.push("/dashboard");
+        }
+      }, 1000);
+      // ---
     }
   };
 
@@ -63,6 +74,8 @@ export default function AuthPage() {
         isClosable: true,
       });
     }
+    // After Google OAuth, use an effect or route guard in your dashboard page
+    // to check for admin email and redirect accordingly
   };
 
   return (
