@@ -39,7 +39,7 @@ export default function PostPropertyPage() {
   const { id } = router.query;
   const isEditMode = typeof id === "string";
 
-  // form state
+  // Form state
   const [title, setTitle] = useState("");
   const [address, setAddress] = useState("");
   const [floor, setFloor] = useState("");
@@ -48,16 +48,16 @@ export default function PostPropertyPage() {
   const [rentPerSF, setRentPerSF] = useState<number>(0);
   const [annualRent, setAnnualRent] = useState<number>(0);
   const [monthlyRent, setMonthlyRent] = useState<number>(0);
-  const [gci3yrs, setGci3yrs] = useState<number>(0);         // <-- note this name
+  const [gci3yrs, setGci3yrs] = useState<number>(0);
   const [brokerEmail, setBrokerEmail] = useState("");
   const [assoc1, setAssoc1] = useState("");
   const [assoc2, setAssoc2] = useState("");
   const [assoc3, setAssoc3] = useState("");
   const [assoc4, setAssoc4] = useState("");
   const [images, setImages] = useState<File[]>([]);
-  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
-  // recalc financials on change
+  // Recalculate dependent values
   useEffect(() => {
     const ann = sizeSF * rentPerSF;
     setAnnualRent(ann);
@@ -65,38 +65,36 @@ export default function PostPropertyPage() {
     setGci3yrs(Math.round(ann * 0.12 * 3));
   }, [sizeSF, rentPerSF]);
 
-  // prefill in edit mode
+  // Prefill if editing
   useEffect(() => {
     if (!isEditMode || !user) return;
-    setSaving(true);
-    supabase
-      .from("properties")
-      .select("*")
-      .eq("id", id as string)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data) {
-          toast({ title: "Load error", description: error?.message, status: "error" });
-        } else {
-          setTitle(data.title);
-          setAddress(data.location);
-          if (data.description) {
-            const [f, s] = data.description.split(",").map((p) => p.trim());
-            setFloor(f.replace("Floor ", ""));
-            setSuite(s.replace("Suite ", ""));
-          }
-          setSizeSF(data.size_sf ?? 0);
-          setRentPerSF(data.rent_per_sf ?? 0);
-          if (data.monthly_rent != null) setMonthlyRent(data.monthly_rent);
-          if (data.gci_3yrs != null) setGci3yrs(data.gci_3yrs);
-          setBrokerEmail(data.broker_email ?? "");
-          setAssoc1(data.assoc1 ?? "");
-          setAssoc2(data.assoc2 ?? "");
-          setAssoc3(data.assoc3 ?? "");
-          setAssoc4(data.assoc4 ?? "");
-        }
-      })
-      .finally(() => setSaving(false));
+    (async () => {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("*")
+        .eq("id", id as string)
+        .single();
+      if (error || !data) {
+        toast({ title: "Error loading", description: error?.message, status: "error" });
+        return;
+      }
+      setTitle(data.title);
+      setAddress(data.location);
+      if (data.description) {
+        const [f, s] = data.description.split(",").map((p) => p.trim());
+        setFloor(f.replace("Floor ", ""));
+        setSuite(s.replace("Suite ", ""));
+      }
+      setSizeSF(data.size_sf ?? 0);
+      setRentPerSF(data.rent_per_sf ?? 0);
+      if (data.monthly_rent != null) setMonthlyRent(data.monthly_rent);
+      if (data.gci_3yrs != null) setGci3yrs(data.gci_3yrs);
+      setBrokerEmail(data.broker_email ?? "");
+      setAssoc1(data.assoc1 ?? "");
+      setAssoc2(data.assoc2 ?? "");
+      setAssoc3(data.assoc3 ?? "");
+      setAssoc4(data.assoc4 ?? "");
+    })();
   }, [id, isEditMode, user, toast]);
 
   const handleFiles = (e: ChangeEvent<HTMLInputElement>) => {
@@ -105,84 +103,88 @@ export default function PostPropertyPage() {
 
   const handleSubmit = async () => {
     if (!user) return;
-    setSaving(true);
+    setUploading(true);
 
-    try {
-      // 1) build payload and insert/update
-      const payload: any = {
-        title,
-        location: address,
-        description: `Floor ${floor}, Suite ${suite}`,
-        owner_id: user.id,
-        size_sf: sizeSF,
-        rent_per_sf: rentPerSF,
-        price: annualRent,
-        monthly_rent: monthlyRent,
-        gci_3yrs: gci3yrs,       // ← correctly map your state here
-        broker_email: brokerEmail,
-        assoc1,
-        assoc2,
-        assoc3,
-        assoc4,
-      };
+    // Build payload
+    const payload = {
+      title,
+      location: address,
+      description: `Floor ${floor}, Suite ${suite}`,
+      owner_id: user.id,
+      size_sf: sizeSF,
+      rent_per_sf: rentPerSF,
+      price: annualRent,
+      monthly_rent: monthlyRent,
+      // ← here we map the JS state `gci3yrs` into the DB column `gci_3yrs`
+      gci_3yrs: gci3yrs,
+      broker_email: brokerEmail,
+      assoc1,
+      assoc2,
+      assoc3,
+      assoc4,
+      updated_at: new Date(),
+    };
 
-      let propId: string;
-      if (isEditMode) {
-        const { error } = await supabase
-          .from("properties")
-          .update(payload)
-          .eq("id", id as string);
-        if (error) throw error;
-        propId = id as string;
-      } else {
-        const { data: inserted, error } = await supabase
-          .from("properties")
-          .insert(payload)
-          .select("id")
-          .single();
-        if (error || !inserted) throw error || new Error("Insert failed");
-        propId = inserted.id;
+    let propId: string;
+    if (isEditMode) {
+      const { error } = await supabase
+        .from("properties")
+        .update(payload)
+        .eq("id", id as string);
+      if (error) {
+        toast({ title: "Update failed", description: error.message, status: "error" });
+        setUploading(false);
+        return;
       }
+      propId = id as string;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("properties")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (error || !inserted) {
+        toast({ title: "Insert failed", description: error?.message, status: "error" });
+        setUploading(false);
+        return;
+      }
+      propId = inserted.id;
+    }
 
-      // 2) upload any new images
+    // Upload images
+    if (images.length) {
       for (const file of images) {
         const ext = file.name.split(".").pop();
-        const path = `${propId}/${Date.now()}.${ext}`;
-        const { data: upData, error: upErr } = await supabase.storage
-          .from("public")
-          .upload(path, file);
-        if (upErr) {
-          console.error("Upload error:", upErr.message);
-          continue;
-        }
-        const { data: urlData, error: urlErr } = supabase.storage
-          .from("public")
-          .getPublicUrl(upData.path);
-        if (urlErr || !urlData.publicUrl) {
-          console.error("URL error:", urlErr?.message);
-          continue;
-        }
-        await supabase
-          .from("properties")
-          .update({ image_url: urlData.publicUrl })
-          .eq("id", propId);
-      }
+        const filename = `${Date.now()}.${ext}`;
+        const path = `${propId}/${filename}`;
 
-      toast({
-        title: isEditMode ? "Updated!" : "Posted!",
-        status: "success",
-        duration: 3000,
-      });
-      router.push("/dashboard");
-    } catch (err: any) {
-      console.error(err);
-      toast({ title: "Error", description: err.message, status: "error" });
-    } finally {
-      setSaving(false);
+        await supabase.storage
+          .from("property-images")
+          .upload(path, file, { cacheControl: "3600", upsert: false });
+
+        const { data: urlData } = supabase.storage
+          .from("property-images")
+          .getPublicUrl(path);
+
+        if (urlData.publicUrl) {
+          await supabase
+            .from("properties")
+            .update({ image_url: urlData.publicUrl })
+            .eq("id", propId);
+        }
+      }
     }
+
+    toast({
+      title: isEditMode ? "Updated!" : "Posted!",
+      status: "success",
+      duration: 3000,
+    });
+    setUploading(false);
+    router.push("/dashboard");
   };
 
-  if (userLoading || saving) {
+  if (userLoading) {
     return (
       <DashboardLayout>
         <Spinner size="xl" m="auto" mt={20} />
@@ -193,9 +195,11 @@ export default function PostPropertyPage() {
   return (
     <DashboardLayout>
       <Box maxW="800px" mx="auto" p={6}>
-        <Heading mb={6}>{isEditMode ? "Edit Property" : "Post a New Property"}</Heading>
+        <Heading mb={6}>
+          {isEditMode ? "Edit Property" : "Post a New Property"}
+        </Heading>
 
-        <Tabs variant="enclosed-colored" colorScheme="teal" isFitted>
+        <Tabs variant="enclosed-colored" colorScheme="teal">
           <TabList mb={4}>
             <Tab>Basic Info</Tab>
             <Tab>Financials</Tab>
@@ -231,7 +235,7 @@ export default function PostPropertyPage() {
               <VStack spacing={4} align="stretch">
                 <FormControl isRequired>
                   <FormLabel>Size (SF)</FormLabel>
-                  <NumberInput value={sizeSF} min={0} onChange={(_, v) => setSizeSF(v)}>
+                  <NumberInput value={sizeSF} onChange={(_, v) => setSizeSF(v)} min={0}>
                     <NumberInputField />
                     <NumberInputStepper>
                       <NumberIncrementStepper />
@@ -243,9 +247,9 @@ export default function PostPropertyPage() {
                   <FormLabel>Rent ($/SF/Yr)</FormLabel>
                   <NumberInput
                     value={rentPerSF}
-                    min={0}
-                    precision={2}
                     onChange={(_, v) => setRentPerSF(v)}
+                    precision={2}
+                    min={0}
                   >
                     <NumberInputField />
                     <NumberInputStepper>
@@ -257,15 +261,15 @@ export default function PostPropertyPage() {
                 <HStack spacing={8} mt={4}>
                   <VStack>
                     <Text fontSize="sm" color="gray.500">Annual Rent</Text>
-                    <Text fontWeight="bold">${annualRent.toLocaleString()}</Text>
+                    <Heading size="md">${annualRent.toLocaleString()}</Heading>
                   </VStack>
                   <VStack>
                     <Text fontSize="sm" color="gray.500">Monthly Rent</Text>
-                    <Text fontWeight="bold">${monthlyRent.toLocaleString()}</Text>
+                    <Heading size="md">${monthlyRent.toLocaleString()}</Heading>
                   </VStack>
                   <VStack>
                     <Text fontSize="sm" color="gray.500">3-Yr GCI</Text>
-                    <Text fontWeight="bold">${gci3yrs.toLocaleString()}</Text>
+                    <Heading size="md">${gci3yrs.toLocaleString()}</Heading>
                   </VStack>
                 </HStack>
               </VStack>
@@ -273,11 +277,7 @@ export default function PostPropertyPage() {
 
             {/* Associates & Media */}
             <TabPanel>
-              <VStack
-                spacing={6}
-                align="stretch"
-                divider={<StackDivider borderColor="gray.200" />}
-              >
+              <VStack spacing={6} align="stretch" divider={<StackDivider />}>
                 <FormControl>
                   <FormLabel>Broker Email</FormLabel>
                   <Input
@@ -286,17 +286,22 @@ export default function PostPropertyPage() {
                     onChange={(e) => setBrokerEmail(e.target.value)}
                   />
                 </FormControl>
-                {[assoc1, assoc2, assoc3, assoc4].map((val, i) => (
-                  <FormControl key={i}>
-                    <FormLabel>Associate {i + 1}</FormLabel>
-                    <Input
-                      value={val}
-                      onChange={(e) =>
-                        [setAssoc1, setAssoc2, setAssoc3, setAssoc4][i](e.target.value)
-                      }
-                    />
-                  </FormControl>
-                ))}
+                <FormControl>
+                  <FormLabel>Associate 1</FormLabel>
+                  <Input value={assoc1} onChange={(e) => setAssoc1(e.target.value)} />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Associate 2</FormLabel>
+                  <Input value={assoc2} onChange={(e) => setAssoc2(e.target.value)} />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Associate 3</FormLabel>
+                  <Input value={assoc3} onChange={(e) => setAssoc3(e.target.value)} />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Associate 4</FormLabel>
+                  <Input value={assoc4} onChange={(e) => setAssoc4(e.target.value)} />
+                </FormControl>
                 <FormControl>
                   <FormLabel>Property Images</FormLabel>
                   <Input type="file" accept="image/*" multiple onChange={handleFiles} />
@@ -308,7 +313,7 @@ export default function PostPropertyPage() {
 
         <Flex mt={6}>
           <Spacer />
-          <Button colorScheme="teal" size="lg" onClick={handleSubmit} isLoading={saving}>
+          <Button colorScheme="teal" size="lg" onClick={handleSubmit} isLoading={uploading}>
             {isEditMode ? "Save Changes" : "Submit"}
           </Button>
         </Flex>

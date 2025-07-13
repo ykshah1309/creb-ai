@@ -1,42 +1,54 @@
 // components/PropertyCard.tsx
-
-import Link from "next/link";
 import {
   LinkBox,
   LinkOverlay,
   Box,
   Image,
-  Text,
   Heading,
+  Text,
+  Button,
+  useToast,
   useColorModeValue,
 } from "@chakra-ui/react";
+import NextLink from "next/link";
+import { useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { useUser } from "@/lib/useUser";
 
-export interface Property {
-  id: string;
-  title: string;
-  location: string;
-  price: number;
-  image_url: string | null;
-  description: string;
-}
+export default function PropertyCard({ property }) {
+  const { user } = useUser();
+  const toast = useToast();
+  const [loading, setLoading] = useState(false);
+  const [liked, setLiked] = useState(false);
 
-export default function PropertyCard({ property }: { property: Property }) {
+  const handleLike = async () => {
+    if (!user) {
+      toast({ title: "Please sign in first", status: "warning" });
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase
+      .from("matches")
+      .insert({
+        from_user: user.id,
+        to_user: property.owner_id,
+        property_id: property.id,
+      });
+    setLoading(false);
+
+    if (error) {
+      toast({ title: "Error liking", description: error.message, status: "error" });
+    } else {
+      setLiked(true);
+      toast({ title: "Property liked!", status: "success" });
+    }
+  };
+
   const bg = useColorModeValue("white", "gray.800");
 
   return (
-    <LinkBox
-      as="article"
-      minW="250px"
-      maxW="250px"
-      bg={bg}
-      borderRadius="xl"
-      overflow="hidden"
-      boxShadow="md"
-      _hover={{ transform: "scale(1.03)", boxShadow: "lg" }}
-      transition="0.2s"
-      cursor="pointer"
-    >
-      <Link href={`/property/${property.id}`} passHref legacyBehavior>
+    <LinkBox bg={bg} borderRadius="xl" boxShadow="md" overflow="hidden">
+      <NextLink href={`/property/${property.id}`} passHref>
         <LinkOverlay>
           <Image
             src={property.image_url || "/placeholder.png"}
@@ -46,21 +58,33 @@ export default function PropertyCard({ property }: { property: Property }) {
             objectFit="cover"
           />
           <Box p={4}>
-            <Heading size="md" mb={1}>
-              {property.title}
-            </Heading>
-            <Text fontSize="sm" color="gray.600" mb={2}>
+            <Heading size="md">{property.title}</Heading>
+            <Text color="gray.600" fontSize="sm">
               {property.location}
             </Text>
-            <Text fontWeight="semibold" color="green.500" mb={2}>
+            <Text color="green.500" fontWeight="semibold">
               ${property.price.toLocaleString()}
             </Text>
-            <Text fontSize="sm" color="gray.700" noOfLines={2}>
+            <Text noOfLines={2} mt={2} fontSize="sm" color="gray.700">
               {property.description}
             </Text>
           </Box>
         </LinkOverlay>
-      </Link>
+      </NextLink>
+
+      {user?.id !== property.owner_id && (
+        <Box p={4}>
+          <Button
+            isFullWidth
+            colorScheme="teal"
+            onClick={handleLike}
+            isLoading={loading}
+            disabled={liked}
+          >
+            {liked ? "Liked" : "Like this property"}
+          </Button>
+        </Box>
+      )}
     </LinkBox>
   );
 }

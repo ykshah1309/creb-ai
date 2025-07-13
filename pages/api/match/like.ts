@@ -3,23 +3,31 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { supabase } from "@/lib/supabaseClient";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  const { property_id } = req.body;
+  // get currently logged-in user
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return res.status(401).json({ error: "Not authenticated" });
 
-  const { from_user, to_user, property_id } = req.body;
+  // look up the owner of that property
+  const { data: prop, error: propErr } = await supabase
+    .from("properties")
+    .select("owner_id")
+    .eq("id", property_id)
+    .single();
+  if (propErr || !prop) return res.status(500).json({ error: propErr?.message });
 
-  if (!from_user || !to_user || !property_id) {
-    return res.status(400).json({ error: "Missing fields" });
-  }
-
-  const { data, error } = await supabase.from("matches").insert([
-    {
-      from_user,
-      to_user,
+  // insert a pending match
+  const { data, error } = await supabase
+    .from("matches")
+    .insert({
+      from_user: user.id,
+      to_user: prop.owner_id,
       property_id,
       status: "pending",
-    },
-  ]);
-
+    })
+    .select()
+    .single();
   if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json({ message: "Match request sent", data });
+
+  return res.status(200).json({ match: data });
 }
