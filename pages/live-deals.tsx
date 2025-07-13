@@ -24,8 +24,8 @@ interface MatchRow {
   id: string;
   property_id: string;
   from_user: string;
+  to_user: string;
   status: string;
-  // assume you added these fields:
   contract_url?: string;
   signature_url?: string;
 }
@@ -33,7 +33,7 @@ interface MatchRow {
 interface Property {
   id: string;
   title: string;
-  image_url: string;
+  image_url: string | null;
   location: string;
   price: number;
 }
@@ -56,24 +56,27 @@ export default function LiveDealsPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal state
+  // Which match the owner is re-uploading for
   const [uploadMatchId, setUploadMatchId] = useState<string | null>(null);
+  // Which match the tenant is signing
   const [signMatchId, setSignMatchId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user?.id) return;
-    loadDeals();
+    if (user?.id) {
+      loadDeals();
+    }
   }, [user]);
 
   async function loadDeals() {
     setLoading(true);
 
-    // 1) Fetch all accepted matches where you are the owner (to_user)
+    // Fetch accepted + contract_url not null
     const { data: matches, error: matchErr } = await supabase
       .from<MatchRow>("matches")
-      .select("id, property_id, from_user, status, contract_url, signature_url")
+      .select("id, property_id, from_user, to_user, status, contract_url, signature_url")
       .eq("to_user", user!.id)
-      .eq("status", "accepted");
+      .eq("status", "accepted")
+      .not("contract_url", "is", null);
 
     if (matchErr) {
       console.error("Error loading deals:", matchErr);
@@ -81,41 +84,28 @@ export default function LiveDealsPage() {
       return;
     }
 
-    // 2) For each match, fetch property and requesting user
-    const dealsData: Deal[] = [];
-    for (const m of matches!) {
-      // property
-      const { data: prop, error: propErr } = await supabase
+    const temp: Deal[] = [];
+    for (const m of matches || []) {
+      // Fetch property details
+      const { data: prop } = await supabase
         .from<Property>("properties")
         .select("id, title, image_url, location, price")
         .eq("id", m.property_id)
         .single();
+      if (!prop) continue;
 
-      if (propErr || !prop) {
-        console.error("Error loading property:", propErr);
-        continue;
-      }
-
-      // requester (from_user)
-      const { data: reqUser, error: userErr } = await supabase
+      // Fetch requester info
+      const { data: reqUser } = await supabase
         .from<User>("users")
         .select("id, name, avatar_url, email")
         .eq("id", m.from_user)
         .single();
+      if (!reqUser) continue;
 
-      if (userErr || !reqUser) {
-        console.error("Error loading user:", userErr);
-        continue;
-      }
-
-      dealsData.push({
-        match: m,
-        property: prop,
-        requester: reqUser,
-      });
+      temp.push({ match: m, property: prop, requester: reqUser });
     }
 
-    setDeals(dealsData);
+    setDeals(temp);
     setLoading(false);
   }
 
@@ -147,7 +137,7 @@ export default function LiveDealsPage() {
               >
                 {/* Property Image */}
                 <Image
-                  src={property.image_url}
+                  src={property.image_url || "/placeholder.png"}
                   alt={property.title}
                   boxSize="100px"
                   objectFit="cover"
@@ -168,9 +158,8 @@ export default function LiveDealsPage() {
                       name={requester.name}
                     />
                     <Text fontWeight="medium">
-                      {requester.name}
+                      {requester.name}{" "}
                       <Text as="span" color="gray.500" fontSize="sm">
-                        {" "}
                         ({requester.email})
                       </Text>
                     </Text>
@@ -224,24 +213,24 @@ export default function LiveDealsPage() {
       {/* Upload Modal */}
       {uploadMatchId && (
         <UploadContractModal
-          isOpen={true}
+          isOpen
+          matchId={uploadMatchId}
           onClose={() => {
             setUploadMatchId(null);
             loadDeals();
           }}
-          matchId={uploadMatchId}
         />
       )}
 
       {/* Sign Modal */}
       {signMatchId && (
         <SignContractModal
-          isOpen={true}
+          isOpen
+          matchId={signMatchId}
           onClose={() => {
             setSignMatchId(null);
             loadDeals();
           }}
-          matchId={signMatchId}
         />
       )}
     </DashboardLayout>
