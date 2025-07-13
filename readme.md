@@ -84,3 +84,65 @@ CREB.Ai brings the power of AI to CRE, making the process as easy as swiping rig
 ---
 
 > **Built for The Okada & Company Hackathon – CRE x AI Agent Challenge**
+
+# CREB.Ai – Setup & Run Instructions
+
+## Prerequisites
+
+- Node.js (v18 or later recommended)  
+- npm (comes with Node.js)  
+- Supabase account & project configured  
+- LM Studio running locally with Qwen 2.5 VL-7b model (or an alternative OpenAI-compatible LLM)  
+- Create a `.env.local` file with necessary environment variables  
+
+---
+
+Steps to Run:
+
+1. Clone the repository
+   git clone <repo-url>
+   cd <repo-folder>
+
+2. Install dependencies
+   npm install
+
+3. Set up environment variables
+   Create a file named .env.local with:
+   NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
+   SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
+   HUGGINGFACE_API_TOKEN=<your-llm-api-token-if-any>
+   NEXTAUTH_URL=http://localhost:3000
+
+4. Configure Supabase
+   - Import provided SQL schema
+   - Add admin user manually (admin@example.com) in users table
+
+5. Start local Supabase (optional)
+   supabase start
+
+6. Run development server
+   npm run dev
+
+7. Run LM Studio with your LLM model
+   Ensure the OpenAI-compatible API endpoint is running and reachable.
+
+8. Access app
+   Open http://localhost:3000
+   - Log in as admin or regular user
+   - Admin redirected to admin dashboard, others to user dashboard
+
+Dependencies Installed by npm install:
+- next
+- react
+- react-dom
+- @chakra-ui/react
+- @chakra-ui/icons
+- react-icons
+- supabase-js
+- chart.js
+- react-chartjs-2
+- typescript (if TS project)
+- others from package.json
+
+That’s it! You should now be able to run and test CREB.Ai locally.
+
