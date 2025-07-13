@@ -1,5 +1,4 @@
 // pages/live-deals.tsx
-
 import {
   Box,
   Heading,
@@ -9,16 +8,16 @@ import {
   Image,
   Spinner,
   Button,
+  Link,
   useColorModeValue,
   Avatar,
   Badge,
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useUser } from "@/lib/useUser";
 import { supabase } from "@/lib/supabaseClient";
-import UploadContractModal from "@/components/UploadContractModal";
-import SignContractModal from "@/components/SignContractModal";
 
 interface MatchRow {
   id: string;
@@ -26,7 +25,7 @@ interface MatchRow {
   from_user: string;
   to_user: string;
   status: string;
-  contract_url?: string;
+  contract_url: string;
   signature_url?: string;
 }
 
@@ -48,64 +47,67 @@ interface User {
 interface Deal {
   match: MatchRow;
   property: Property;
-  requester: User;
+  otherParty: User;
+  amIssuer: boolean;
 }
 
 export default function LiveDealsPage() {
+  const router = useRouter();
   const { user, loading: userLoading } = useUser();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Which match the owner is re-uploading for
-  const [uploadMatchId, setUploadMatchId] = useState<string | null>(null);
-  // Which match the tenant is signing
-  const [signMatchId, setSignMatchId] = useState<string | null>(null);
-
   useEffect(() => {
-    if (user?.id) {
-      loadDeals();
-    }
-  }, [user]);
+    if (!user?.id) return;
+    fetchDeals();
+  }, [router.asPath, user?.id]);
 
-  async function loadDeals() {
+  async function fetchDeals() {
     setLoading(true);
 
-    // Fetch accepted + contract_url not null
-    const { data: matches, error: matchErr } = await supabase
+    const { data: matches, error } = await supabase
       .from<MatchRow>("matches")
-      .select("id, property_id, from_user, to_user, status, contract_url, signature_url")
-      .eq("to_user", user!.id)
+      .select("id,property_id,from_user,to_user,status,contract_url,signature_url")
       .eq("status", "accepted")
-      .not("contract_url", "is", null);
+      .not("contract_url", "is", null)
+      .or(`from_user.eq.${user!.id},to_user.eq.${user!.id}`);
 
-    if (matchErr) {
-      console.error("Error loading deals:", matchErr);
+    console.log("live-deals raw:", { matches, error });
+
+    if (error || !matches) {
+      setDeals([]);
       setLoading(false);
       return;
     }
 
-    const temp: Deal[] = [];
-    for (const m of matches || []) {
-      // Fetch property details
+    const out: Deal[] = [];
+    for (const m of matches) {
+      // property
       const { data: prop } = await supabase
         .from<Property>("properties")
-        .select("id, title, image_url, location, price")
+        .select("id,title,image_url,location,price")
         .eq("id", m.property_id)
         .single();
       if (!prop) continue;
 
-      // Fetch requester info
-      const { data: reqUser } = await supabase
+      // other party
+      const otherId = m.from_user === user!.id ? m.to_user : m.from_user;
+      const { data: other } = await supabase
         .from<User>("users")
-        .select("id, name, avatar_url, email")
-        .eq("id", m.from_user)
+        .select("id,name,avatar_url,email")
+        .eq("id", otherId)
         .single();
-      if (!reqUser) continue;
+      if (!other) continue;
 
-      temp.push({ match: m, property: prop, requester: reqUser });
+      out.push({
+        match: m,
+        property: prop,
+        otherParty: other,
+        amIssuer: m.from_user === user!.id,
+      });
     }
 
-    setDeals(temp);
+    setDeals(out);
     setLoading(false);
   }
 
@@ -126,81 +128,72 @@ export default function LiveDealsPage() {
           <Text color="gray.500">No active deals right now.</Text>
         ) : (
           <VStack spacing={6} align="stretch">
-            {deals.map(({ match, property, requester }) => (
+            {deals.map(({ match, property, otherParty, amIssuer }) => (
               <HStack
                 key={match.id}
                 p={4}
-                bg={useColorModeValue("white", "gray.800")}
+                bg={useColorModeValue("white","gray.800")}
                 borderRadius="lg"
                 boxShadow="md"
-                align="center"
+                align="start"
               >
-                {/* Property Image */}
+                {/* Property */}
                 <Image
-                  src={property.image_url || "/placeholder.png"}
+                  src={property.image_url ?? "/placeholder.png"}
                   alt={property.title}
                   boxSize="100px"
                   objectFit="cover"
                   borderRadius="md"
                 />
 
-                {/* Details */}
                 <Box flex="1">
                   <Heading size="md">{property.title}</Heading>
-                  <Text fontSize="sm" color="gray.500">
+                  <Text fontSize="sm" color="gray.500" mb={2}>
                     {property.location} — ${property.price.toLocaleString()}
                   </Text>
 
-                  <HStack mt={2} spacing={3}>
+                  <HStack spacing={2}>
                     <Avatar
                       size="sm"
-                      src={requester.avatar_url || undefined}
-                      name={requester.name}
+                      src={otherParty.avatar_url ?? undefined}
+                      name={otherParty.name}
                     />
-                    <Text fontWeight="medium">
-                      {requester.name}{" "}
+                    <Text>
+                      {otherParty.name}{" "}
                       <Text as="span" color="gray.500" fontSize="sm">
-                        ({requester.email})
+                        ({otherParty.email})
                       </Text>
                     </Text>
                   </HStack>
+
+                  <Box mt={3}>
+                    <Link href={match.contract_url} isExternal color="teal.500">
+                      📄 View Lease PDF
+                    </Link>
+                  </Box>
                 </Box>
 
-                {/* Contract Status */}
-                <Badge
-                  colorScheme={
-                    match.signature_url
-                      ? "green"
-                      : match.contract_url
-                      ? "blue"
-                      : "orange"
-                  }
-                >
-                  {match.signature_url
-                    ? "Signed"
-                    : match.contract_url
-                    ? "Uploaded"
-                    : "Pending"}
-                </Badge>
-
-                {/* Actions */}
                 <VStack spacing={2}>
-                  {!match.contract_url && (
+                  <Badge colorScheme={match.signature_url ? "green" : "blue"}>
+                    {match.signature_url ? "Signed" : "Lease Sent"}
+                  </Badge>
+
+                  {amIssuer && (
                     <Button
                       size="sm"
                       colorScheme="blue"
-                      onClick={() => setUploadMatchId(match.id)}
+                      onClick={()=>router.push(`/matches?matchId=${match.id}`)}
                     >
-                      Upload Contract
+                      Edit Lease
                     </Button>
                   )}
-                  {match.contract_url && !match.signature_url && (
+                  {!match.signature_url && (
                     <Button
                       size="sm"
                       colorScheme="teal"
-                      onClick={() => setSignMatchId(match.id)}
+                      onClick={()=>router.push(`/matches?matchId=${match.id}`)}
                     >
-                      Sign Contract
+                      Sign Lease
                     </Button>
                   )}
                 </VStack>
@@ -209,30 +202,6 @@ export default function LiveDealsPage() {
           </VStack>
         )}
       </Box>
-
-      {/* Upload Modal */}
-      {uploadMatchId && (
-        <UploadContractModal
-          isOpen
-          matchId={uploadMatchId}
-          onClose={() => {
-            setUploadMatchId(null);
-            loadDeals();
-          }}
-        />
-      )}
-
-      {/* Sign Modal */}
-      {signMatchId && (
-        <SignContractModal
-          isOpen
-          matchId={signMatchId}
-          onClose={() => {
-            setSignMatchId(null);
-            loadDeals();
-          }}
-        />
-      )}
     </DashboardLayout>
   );
 }
