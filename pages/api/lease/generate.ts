@@ -1,9 +1,9 @@
 // pages/api/lease/generate.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib"; // or your PDF lib of choice
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
-// Supabase admin client—make sure SUPABASE_SERVICE_ROLE_KEY is set in your .env
+// Supabase admin client
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -23,7 +23,7 @@ export default async function handler(
   }
 
   try {
-    // 1) Load the match + property + users
+    // 1) Fetch match
     const { data: match, error: mErr } = await supabaseAdmin
       .from("matches")
       .select("id, property_id, from_user, to_user")
@@ -33,43 +33,41 @@ export default async function handler(
       return res.status(404).json({ error: "Match not found" });
     }
 
-    // 2) Draft a simple one-page PDF lease
+    // 2) Build lease text template
+    const leaseText = [
+      "Commercial Lease Agreement",
+      "",
+      `Match ID: ${match.id}`,
+      "Term: 12 months",
+      "Rent: $__________ per month",
+      "",
+      "Landlord Signature: ____________________",
+      "Tenant Signature: ____________________",
+    ].join("\n");
+
+    // 3) Render PDF
     const pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage();
-    const { width, height } = page.getSize();
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const { width, height } = page.getSize();
     const fontSize = 12;
 
-    page.drawText(`Commercial Lease Agreement`, {
-      x: 50,
-      y: height - 4 * fontSize,
-      size: 18,
-      font,
-      color: rgb(0, 0, 0),
-    });
-
-    page.drawText(`Match ID: ${match.id}`, { x: 50, y: height - 6 * fontSize, size: fontSize, font });
-    page.drawText(`Term: 12 months`, { x: 50, y: height - 7 * fontSize, size: fontSize, font });
-    page.drawText(`Rent: $____________ per month`, { x: 50, y: height - 8 * fontSize, size: fontSize, font });
-    page.drawText(`\nLandlord Signature: ____________________`, {
-      x: 50,
-      y: height - 10 * fontSize,
-      size: fontSize,
-      font,
-    });
-    page.drawText(`\nTenant Signature: ____________________`, {
-      x: 50,
-      y: height - 12 * fontSize,
-      size: fontSize,
-      font,
+    leaseText.split("\n").forEach((line, i) => {
+      page.drawText(line, {
+        x: 50,
+        y: height - (i + 2) * fontSize,
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
     });
 
     const pdfBytes = await pdfDoc.save();
 
-    // 3) Upload the PDF to storage
+    // 4) Upload PDF to storage
     const filePath = `leases/${matchId}.pdf`;
     const { error: uploadErr } = await supabaseAdmin.storage
-      .from("property-images")      // or your "leases" bucket
+      .from("property-images")
       .upload(filePath, pdfBytes, {
         contentType: "application/pdf",
         upsert: true,
@@ -80,22 +78,22 @@ export default async function handler(
       .from("property-images")
       .getPublicUrl(filePath);
 
-    // 4) Update the match row with the contract_url
+    // 5) Update match row (contract_url + lease_text)
     await supabaseAdmin
       .from("matches")
-      .update({ contract_url: urlData.publicUrl })
+      .update({ contract_url: urlData.publicUrl, lease_text: leaseText })
       .eq("id", matchId);
 
-    // 5) Insert a chat message so it shows up in the chat log
+    // 6) Insert chat message
     await supabaseAdmin.from("messages").insert({
       match_id: matchId,
       sender: senderId,
       content: `📄 Lease document sent: ${urlData.publicUrl}`,
     });
 
-    return res.status(200).json({ url: urlData.publicUrl });
+    res.status(200).json({ url: urlData.publicUrl });
   } catch (error: any) {
     console.error("Lease generation error:", error);
-    return res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 }
