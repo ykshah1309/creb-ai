@@ -14,11 +14,6 @@ export default function ChatbotUI({ user, listings, matches, leases }) {
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // DEBUG: See what user is passed in
-  useEffect(() => {
-    console.log("ChatbotUI user prop:", user);
-  }, [user]);
-
   // Load latest chat history for this user (on mount)
   useEffect(() => {
     if (!user) {
@@ -28,6 +23,7 @@ export default function ChatbotUI({ user, listings, matches, leases }) {
           text: "Please log in to chat with CREB.Ai assistant.",
         },
       ]);
+      setHistoryId(null);
       return;
     }
     (async () => {
@@ -40,8 +36,6 @@ export default function ChatbotUI({ user, listings, matches, leases }) {
           .limit(1)
           .single();
 
-        console.log("Loaded ai_chat_history:", { data, error });
-
         if (data && data.messages) {
           setMessages(data.messages);
           setHistoryId(data.id);
@@ -52,15 +46,16 @@ export default function ChatbotUI({ user, listings, matches, leases }) {
               text: "Hi! I’m your CREB.Ai assistant. Ask me anything about your listings, matches, leases, or property recommendations.",
             },
           ]);
+          setHistoryId(null);
         }
       } catch (err) {
-        console.error("Error loading chat history:", err);
         setMessages([
           {
             role: "assistant",
             text: "Hi! I’m your CREB.Ai assistant. Ask me anything about your listings, matches, leases, or property recommendations.",
           },
         ]);
+        setHistoryId(null);
       }
     })();
   }, [user]);
@@ -98,7 +93,7 @@ export default function ChatbotUI({ user, listings, matches, leases }) {
   const handleSend = async () => {
     if (!input.trim() || !messages || sending) return;
     setSending(true);
-    const newMessage = { role: "user" as const, text: input.trim() };
+    const newMessage: Message = { role: "user", text: input.trim() };
     const nextMessages = [...messages, newMessage];
     setMessages(nextMessages);
     setInput("");
@@ -122,15 +117,14 @@ export default function ChatbotUI({ user, listings, matches, leases }) {
         "Sorry, I couldn't generate a response. Please try again later.";
       const finalMessages = [
         ...nextMessages,
-        { role: "assistant" as const, text: aiText },
+        { role: "assistant", text: aiText },
       ];
       setMessages(finalMessages);
       saveHistory(finalMessages);
     } catch (err) {
-      console.error("Error sending message to AI agent:", err);
       setMessages((prev) =>
         (prev || []).slice(0, -1).concat({
-          role: "assistant" as const,
+          role: "assistant",
           text: "Sorry, the AI agent is currently unavailable.",
         })
       );
@@ -175,7 +169,7 @@ export default function ChatbotUI({ user, listings, matches, leases }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !sending) handleSend();
+            if (e.key === "Enter" && !sending && user) handleSend();
           }}
           flex="1"
           isDisabled={sending || !user}
