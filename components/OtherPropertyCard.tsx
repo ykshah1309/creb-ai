@@ -1,6 +1,6 @@
 // components/OtherPropertyCard.tsx
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import NextLink from "next/link";
 import {
   Box,
@@ -12,8 +12,10 @@ import {
   LinkOverlay,
   useToast,
   useColorModeValue,
+  Spinner,
 } from "@chakra-ui/react";
 import { motion } from "framer-motion";
+import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/lib/useUser";
 
 export type Property = {
@@ -29,13 +31,27 @@ export type Property = {
 const MotionLinkBox = motion(LinkBox);
 
 export default function OtherPropertyCard({ property }: { property: Property }) {
-  const { user } = useUser();
+  const { user, loading: userLoading } = useUser();
   const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [liked, setLiked] = useState(false);
 
   const isOwner = user?.id === property.owner_id;
   const bg = useColorModeValue("white", "gray.800");
+
+  // If this session has already liked this property, mark it as liked:
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("matches")
+        .select("id")
+        .eq("from_user", user.id)
+        .eq("property_id", property.id)
+        .single();
+      if (!error && data) setLiked(true);
+    })();
+  }, [user, property.id]);
 
   const handleLike = async () => {
     if (!user) {
@@ -44,23 +60,45 @@ export default function OtherPropertyCard({ property }: { property: Property }) 
     }
     setLoading(true);
 
-    // call your API route which uses supabase to insert into matches
-    const res = await fetch("/api/match/like", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ property_id: property.id }),
-    });
+    // Insert a new "match" row
+    const { error } = await supabase
+      .from("matches")
+      .insert({
+        from_user: user.id,
+        to_user: property.owner_id,
+        property_id: property.id,
+        status: "pending",
+      });
 
     setLoading(false);
 
-    if (res.ok) {
+    if (error) {
+      toast({ title: "Error liking", description: error.message, status: "error" });
+    } else {
       setLiked(true);
       toast({ title: "Property liked!", status: "success" });
-    } else {
-      const err = await res.json();
-      toast({ title: "Error liking", description: err.error, status: "error" });
     }
   };
+
+  // while we’re determining user/loading state, show a spinner placeholder
+  if (userLoading) {
+    return (
+      <Box
+        bg={bg}
+        borderRadius="xl"
+        overflow="hidden"
+        boxShadow="md"
+        minW="250px"
+        maxW="250px"
+        h="300px"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Spinner />
+      </Box>
+    );
+  }
 
   return (
     <MotionLinkBox
@@ -103,21 +141,24 @@ export default function OtherPropertyCard({ property }: { property: Property }) 
           {property.description}
         </Text>
 
-        {!isOwner && !liked && (
-          <Button
-            colorScheme="teal"
-            size="sm"
-            isFullWidth
-            isLoading={loading}
-            onClick={handleLike}
-          >
-            Like this property
-          </Button>
-        )}
-        {!isOwner && liked && (
-          <Button colorScheme="green" size="sm" isFullWidth isDisabled>
-            Liked ✓
-          </Button>
+        {!isOwner && (
+          <>
+            {!liked ? (
+              <Button
+                colorScheme="teal"
+                size="sm"
+                isFullWidth
+                isLoading={loading}
+                onClick={handleLike}
+              >
+                Like this property
+              </Button>
+            ) : (
+              <Button colorScheme="green" size="sm" isFullWidth isDisabled>
+                Liked ✓
+              </Button>
+            )}
+          </>
         )}
       </Box>
     </MotionLinkBox>
