@@ -40,3 +40,7 @@ a {
     color-scheme: dark;
   }
 }
+
+.scrolling {
+  cursor: grabbing !important;
+}

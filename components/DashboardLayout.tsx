@@ -17,6 +17,8 @@ import {
 import { useRouter } from "next/router";
 import React from "react";
 
+const SIDEBAR_WIDTH = "250px";
+
 const sidebarItems = [
   { icon: FiHome, label: "Home", path: "/dashboard" },
   { icon: FiSearch, label: "Browse", path: "/dashboard?showSearch=true" },
@@ -39,8 +41,16 @@ export default function DashboardLayout({
 
   return (
     <Box minH="100vh" bg={bg} display="flex">
-      {/* Sidebar */}
-      <Box w="250px" p={6} bg="black" color="white" minH="100vh">
+      {/* Sidebar (fixed width, always same size) */}
+      <Box
+        w={SIDEBAR_WIDTH}
+        minW={SIDEBAR_WIDTH}
+        maxW={SIDEBAR_WIDTH}
+        p={6}
+        bg="black"
+        color="white"
+        minH="100vh"
+      >
         <Heading size="md" mb={10} fontWeight="bold">
           CREB.Ai
         </Heading>
@@ -62,7 +72,11 @@ export default function DashboardLayout({
                 icon={item.icon}
                 label={item.label}
                 path={item.path}
-                isActive={router.pathname === item.path}
+                isActive={
+                  item.path === "/dashboard"
+                    ? router.pathname === "/dashboard"
+                    : router.asPath === item.path
+                }
                 onClick={() =>
                   item.label === "Browse"
                     ? onBrowseClick?.()
@@ -73,9 +87,8 @@ export default function DashboardLayout({
           )}
         </VStack>
       </Box>
-
       {/* Main Content */}
-      <Box flex="1" p={10}>
+      <Box flex="1" p={{ base: 4, md: 10 }}>
         {children}
       </Box>
     </Box>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Box,
   Heading,
@@ -6,7 +6,6 @@ import {
   Spinner,
   VStack,
   Button,
-  HStack,
   Drawer,
   DrawerOverlay,
   DrawerContent,
@@ -21,19 +20,64 @@ import {
 } from "@chakra-ui/react";
 import { useUser } from "@/lib/useUser";
 import { supabase } from "@/lib/supabaseClient";
-import DashboardLayout from "@/components/DashboardLayout";
-import OtherPropertyCard from "@/components/OtherPropertyCard";
 import MyPropertyCard from "@/components/MyPropertyCard";
+import OtherPropertyCard from "@/components/OtherPropertyCard";
 import MatchedPropertyCard from "@/components/MatchedPropertyCard";
+import DashboardSidebar from "@/components/DashboardSidebar";
+import ChatbotUI from "@/components/ChatbotUI";
+import { animate } from "framer-motion";
+
+// Mouse-follow horizontal scroll
+function useResponsiveHoverScroll() {
+  const ref = useRef<HTMLDivElement>(null);
+  const anim = useRef<any>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    function handleMove(e: MouseEvent) {
+      if (e.buttons !== 0) return;
+      const rect = el.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const percent = Math.max(0, Math.min(1, x / rect.width));
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      const targetScroll = percent * maxScroll;
+      if (anim.current) anim.current.stop();
+      anim.current = animate(el.scrollLeft, targetScroll, {
+        type: "tween",
+        duration: 0.22,
+        onUpdate: v => { el.scrollLeft = v; },
+      });
+    }
+
+    function handleLeave() {
+      if (anim.current) anim.current.stop();
+    }
+
+    if (window.matchMedia("(pointer: fine)").matches) {
+      el.addEventListener("mousemove", handleMove);
+      el.addEventListener("mouseleave", handleLeave);
+    }
+
+    return () => {
+      el.removeEventListener("mousemove", handleMove);
+      el.removeEventListener("mouseleave", handleLeave);
+      if (anim.current) anim.current.stop();
+    };
+  }, []);
+
+  return ref;
+}
 
 export default function DashboardPage() {
   const { user, loading: uLoading } = useUser();
   const [myListings, setMy] = useState<any[]>([]);
   const [otherListings, setOther] = useState<any[]>([]);
   const [matched, setMatched] = useState<any[]>([]);
+  const [leases, setLeases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // --- FILTER STATE ---
   const [filter, setFilter] = useState({
     address: "",
     floor: "",
@@ -44,31 +88,41 @@ export default function DashboardPage() {
     maxRentPerSF: 0,
   });
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
+  const [showAIDrawer, setShowAIDrawer] = useState(false);
 
-  // --- DATA FETCH ---
   useEffect(() => {
     if (!user) return;
     (async () => {
       setLoading(true);
+
+      // All properties
       const { data: all } = await supabase.from("properties").select("*");
+      setMy(all!.filter((p) => p.owner_id === user.id));
+      setOther(all!.filter((p) => p.owner_id !== user.id));
+
+      // Matches
       const { data: mk } = await supabase
         .from("matches")
         .select("id, property_id, properties(*)")
         .eq("from_user", user.id)
         .eq("status", "accepted");
-      setMy(all!.filter((p) => p.owner_id === user.id));
-      setOther(all!.filter((p) => p.owner_id !== user.id));
       setMatched(mk!.map((m) => ({ matchId: m.id, property: m.properties })));
+
+      // Leases (if you have a 'leases' table; adjust if your schema differs)
+      const { data: leasesData } = await supabase
+        .from("leases")
+        .select("*")
+        .eq("user_id", user.id);
+      setLeases(leasesData ?? []);
+
       setLoading(false);
     })();
   }, [user]);
 
-  // --- FILTER HANDLER ---
   const handleFilterChange = (key, value) => {
     setFilter((prev) => ({ ...prev, [key]: value }));
   };
 
-  // --- FILTERED ARRAYS ---
   const filteredOther = otherListings.filter((p) => {
     if (
       filter.address &&
@@ -135,66 +189,98 @@ export default function DashboardPage() {
     return true;
   });
 
-  // --- PANEL RENDER ---
-  const panel = (title: string, count: number, children: React.ReactNode) => (
-    <Box w="full">
-      <Heading size="md">{title}</Heading>
+  // Responsive hover scroll refs
+  const myListingsScroll = useResponsiveHoverScroll();
+  const otherListingsScroll = useResponsiveHoverScroll();
+  const matchedListingsScroll = useResponsiveHoverScroll();
+
+  const panel = (
+    title: string,
+    count: number,
+    children: React.ReactNode,
+    scrollRef
+  ) => (
+    <Box w="full" mb={10}>
+      <Heading size="md" mb={2}>{title}</Heading>
       <Text color="gray.500" mb={2}>
         {count} properties
       </Text>
-      <HStack
-        spacing={6}
+      <Box
+        ref={scrollRef}
+        position="relative"
         overflowX="auto"
+        display="flex"
         sx={{
           scrollbarWidth: "none",
           "&::-webkit-scrollbar": { display: "none" },
+          cursor: "pointer",
+          userSelect: "none",
+          py: 2,
+          gap: "1.5rem",
         }}
-        py={2}
+        onPointerDown={e => e.currentTarget.focus()}
       >
         {children}
-      </HStack>
+      </Box>
     </Box>
   );
 
-  // --- MAIN RENDER ---
   if (uLoading || loading) {
     return (
-      <DashboardLayout>
-        <Spinner size="xl" m="auto" mt={20} />
-      </DashboardLayout>
+      <Box display="flex" minH="100vh">
+        <DashboardSidebar onBrowseClick={() => setShowFilterDrawer(true)} />
+        <Box flex="1" display="flex" alignItems="center" justifyContent="center">
+          <Spinner size="xl" />
+        </Box>
+      </Box>
     );
   }
 
   return (
-    <DashboardLayout onBrowseClick={() => setShowFilterDrawer(true)}>
-      <Box px={6} py={10} overflowX="hidden">
-        <Heading>Welcome back!</Heading>
-        <Text mb={6} color="gray.500">
+    <Box display="flex" minH="100vh" bg="gray.50">
+      {/* Sidebar: fixed, not scrollable */}
+      <DashboardSidebar onBrowseClick={() => setShowFilterDrawer(true)} />
+
+      {/* Main dashboard: vertical scroll, panels stacked */}
+      <Box
+        flex="1"
+        maxHeight="100vh"
+        overflowY="auto"
+        sx={{
+          scrollbarWidth: "none",
+          "&::-webkit-scrollbar": { display: "none" },
+        }}
+        py={10}
+        px={{ base: 2, md: 10 }}
+      >
+        <Heading mb={2}>Welcome back!</Heading>
+        <Text mb={8} color="gray.500">
           Like other people’s listings, accept incoming likes, then chat in real time.
         </Text>
-        <VStack spacing={12} align="start">
-          {panel(
-            "My Listings",
-            myListings.length,
-            myListings.map((p) => <MyPropertyCard key={p.id} property={p} />)
-          )}
-          {panel(
-            "Other Properties",
-            filteredOther.length,
-            filteredOther.map((p) => <OtherPropertyCard key={p.id} property={p} />)
-          )}
-          {panel(
-            "Matched Listings",
-            filteredMatched.length,
-            filteredMatched.map(({ matchId, property }) => (
-              <MatchedPropertyCard
-                key={matchId}
-                property={property}
-                matchId={matchId}
-              />
-            ))
-          )}
-        </VStack>
+        {panel(
+          "My Listings",
+          myListings.length,
+          myListings.map((p) => <MyPropertyCard key={p.id} property={p} />),
+          myListingsScroll
+        )}
+        {panel(
+          "Other Properties",
+          filteredOther.length,
+          filteredOther.map((p) => <OtherPropertyCard key={p.id} property={p} />),
+          otherListingsScroll
+        )}
+        {panel(
+          "Matched Listings",
+          filteredMatched.length,
+          filteredMatched.map(({ matchId, property }) => (
+            <MatchedPropertyCard
+              key={matchId}
+              property={property}
+              matchId={matchId}
+            />
+          )),
+          matchedListingsScroll
+        )}
       </Box>
 
       {/* --- RIGHT FILTER DRAWER --- */}
@@ -217,7 +303,7 @@ export default function DashboardPage() {
                   placeholder="Any"
                 />
               </FormControl>
-              <HStack>
+              <Box display="flex" gap={4}>
                 <FormControl>
                   <FormLabel>Floor</FormLabel>
                   <Input
@@ -234,8 +320,8 @@ export default function DashboardPage() {
                     placeholder="Any"
                   />
                 </FormControl>
-              </HStack>
-              <HStack>
+              </Box>
+              <Box display="flex" gap={4}>
                 <FormControl>
                   <FormLabel>Min Size (SF)</FormLabel>
                   <NumberInput
@@ -256,8 +342,8 @@ export default function DashboardPage() {
                     <NumberInputField />
                   </NumberInput>
                 </FormControl>
-              </HStack>
-              <HStack>
+              </Box>
+              <Box display="flex" gap={4}>
                 <FormControl>
                   <FormLabel>Min Rent ($/SF/Yr)</FormLabel>
                   <NumberInput
@@ -278,7 +364,7 @@ export default function DashboardPage() {
                     <NumberInputField />
                   </NumberInput>
                 </FormControl>
-              </HStack>
+              </Box>
               <Button colorScheme="teal" onClick={() => setShowFilterDrawer(false)}>
                 Apply Filters
               </Button>
@@ -286,6 +372,47 @@ export default function DashboardPage() {
           </DrawerBody>
         </DrawerContent>
       </Drawer>
-    </DashboardLayout>
+
+      {/* --- AI Chatbot Sidebar --- */}
+      <Drawer
+        isOpen={showAIDrawer}
+        placement="right"
+        size="md"
+        onClose={() => setShowAIDrawer(false)}
+      >
+        <DrawerOverlay />
+        <DrawerContent display="flex" flexDirection="column">
+          <DrawerCloseButton />
+          <DrawerHeader borderBottomWidth="1px">CREB.Ai Assistant</DrawerHeader>
+          <DrawerBody p={0} display="flex" flexDirection="column" height="100%">
+            <ChatbotUI
+              user={user}
+              listings={myListings}
+              matches={matched}
+              leases={leases}
+            />
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Floating AI button */}
+      <Box
+        position="fixed"
+        bottom={{ base: 6, md: 10 }}
+        right={{ base: 6, md: 10 }}
+        zIndex={2000}
+      >
+        <Button
+          borderRadius="full"
+          boxSize="60px"
+          colorScheme="teal"
+          shadow="lg"
+          fontSize="2xl"
+          onClick={() => setShowAIDrawer(true)}
+        >
+          🤖
+        </Button>
+      </Box>
+    </Box>
   );
 }
