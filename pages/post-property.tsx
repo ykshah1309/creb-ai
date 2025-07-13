@@ -1,148 +1,317 @@
+// pages/post-property.tsx
+
 import {
   Box,
-  Button,
+  Text,
+  Heading,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
   FormControl,
   FormLabel,
   Input,
-  Textarea,
+  NumberInput,
+  NumberInputField,
+  NumberInputStepper,
+  NumberIncrementStepper,
+  NumberDecrementStepper,
+  Button,
   VStack,
-  Heading,
+  HStack,
+  Spinner,
   useToast,
-  Image,
+  StackDivider,
+  Flex,
+  Spacer,
 } from "@chakra-ui/react";
-import { useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { useState, ChangeEvent, useEffect } from "react";
+import { useRouter } from "next/router";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useUser } from "@/lib/useUser";
-import { useRouter } from "next/router";
+import { supabase } from "@/lib/supabaseClient";
 
-export default function PostProperty() {
-  const toast = useToast();
+export default function PostPropertyPage() {
+  const { user, loading: userLoading } = useUser();
   const router = useRouter();
-  const { user } = useUser();
+  const toast = useToast();
+  const { id } = router.query;
+  const isEditMode = typeof id === "string";
 
+  // form state
   const [title, setTitle] = useState("");
-  const [location, setLocation] = useState("");
-  const [price, setPrice] = useState("");
-  const [description, setDescription] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [address, setAddress] = useState("");
+  const [floor, setFloor] = useState("");
+  const [suite, setSuite] = useState("");
+  const [sizeSF, setSizeSF] = useState<number>(0);
+  const [rentPerSF, setRentPerSF] = useState<number>(0);
+  const [annualRent, setAnnualRent] = useState<number>(0);
+  const [monthlyRent, setMonthlyRent] = useState<number>(0);
+  const [gci3yrs, setGci3yrs] = useState<number>(0);         // <-- note this name
+  const [brokerEmail, setBrokerEmail] = useState("");
+  const [assoc1, setAssoc1] = useState("");
+  const [assoc2, setAssoc2] = useState("");
+  const [assoc3, setAssoc3] = useState("");
+  const [assoc4, setAssoc4] = useState("");
+  const [images, setImages] = useState<File[]>([]);
+  const [saving, setSaving] = useState(false);
 
-  const handleImageChange = (e: any) => {
-    const file = e.target.files[0];
-    if (file) {
-      setImageFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-    }
+  // recalc financials on change
+  useEffect(() => {
+    const ann = sizeSF * rentPerSF;
+    setAnnualRent(ann);
+    setMonthlyRent(Math.round(ann / 12));
+    setGci3yrs(Math.round(ann * 0.12 * 3));
+  }, [sizeSF, rentPerSF]);
+
+  // prefill in edit mode
+  useEffect(() => {
+    if (!isEditMode || !user) return;
+    setSaving(true);
+    supabase
+      .from("properties")
+      .select("*")
+      .eq("id", id as string)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data) {
+          toast({ title: "Load error", description: error?.message, status: "error" });
+        } else {
+          setTitle(data.title);
+          setAddress(data.location);
+          if (data.description) {
+            const [f, s] = data.description.split(",").map((p) => p.trim());
+            setFloor(f.replace("Floor ", ""));
+            setSuite(s.replace("Suite ", ""));
+          }
+          setSizeSF(data.size_sf ?? 0);
+          setRentPerSF(data.rent_per_sf ?? 0);
+          if (data.monthly_rent != null) setMonthlyRent(data.monthly_rent);
+          if (data.gci_3yrs != null) setGci3yrs(data.gci_3yrs);
+          setBrokerEmail(data.broker_email ?? "");
+          setAssoc1(data.assoc1 ?? "");
+          setAssoc2(data.assoc2 ?? "");
+          setAssoc3(data.assoc3 ?? "");
+          setAssoc4(data.assoc4 ?? "");
+        }
+      })
+      .finally(() => setSaving(false));
+  }, [id, isEditMode, user, toast]);
+
+  const handleFiles = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) setImages(Array.from(e.target.files));
   };
 
   const handleSubmit = async () => {
-    if (!title || !location || !price || !description || !imageFile) {
-      toast({
-        title: "Missing fields.",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
+    if (!user) return;
+    setSaving(true);
 
     try {
-      const fileExt = imageFile.name.split(".").pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `properties/${fileName}`;
+      // 1) build payload and insert/update
+      const payload: any = {
+        title,
+        location: address,
+        description: `Floor ${floor}, Suite ${suite}`,
+        owner_id: user.id,
+        size_sf: sizeSF,
+        rent_per_sf: rentPerSF,
+        price: annualRent,
+        monthly_rent: monthlyRent,
+        gci_3yrs: gci3yrs,       // ← correctly map your state here
+        broker_email: brokerEmail,
+        assoc1,
+        assoc2,
+        assoc3,
+        assoc4,
+      };
 
-      const { error: uploadError } = await supabase.storage
-        .from("property-images")
-        .upload(filePath, imageFile);
+      let propId: string;
+      if (isEditMode) {
+        const { error } = await supabase
+          .from("properties")
+          .update(payload)
+          .eq("id", id as string);
+        if (error) throw error;
+        propId = id as string;
+      } else {
+        const { data: inserted, error } = await supabase
+          .from("properties")
+          .insert(payload)
+          .select("id")
+          .single();
+        if (error || !inserted) throw error || new Error("Insert failed");
+        propId = inserted.id;
+      }
 
-      if (uploadError) throw uploadError;
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("property-images").getPublicUrl(filePath);
-
-      const { error: insertError } = await supabase
-        .from("properties")
-        .insert([
-          {
-            title,
-            location,
-            price: parseInt(price),
-            description,
-            image_url: publicUrl,
-            owner_id: user?.id,
-          },
-        ]);
-
-      if (insertError) throw insertError;
+      // 2) upload any new images
+      for (const file of images) {
+        const ext = file.name.split(".").pop();
+        const path = `${propId}/${Date.now()}.${ext}`;
+        const { data: upData, error: upErr } = await supabase.storage
+          .from("public")
+          .upload(path, file);
+        if (upErr) {
+          console.error("Upload error:", upErr.message);
+          continue;
+        }
+        const { data: urlData, error: urlErr } = supabase.storage
+          .from("public")
+          .getPublicUrl(upData.path);
+        if (urlErr || !urlData.publicUrl) {
+          console.error("URL error:", urlErr?.message);
+          continue;
+        }
+        await supabase
+          .from("properties")
+          .update({ image_url: urlData.publicUrl })
+          .eq("id", propId);
+      }
 
       toast({
-        title: "Property listed!",
+        title: isEditMode ? "Updated!" : "Posted!",
         status: "success",
         duration: 3000,
-        isClosable: true,
       });
-
       router.push("/dashboard");
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast({
-        title: "Something went wrong.",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
+      toast({ title: "Error", description: err.message, status: "error" });
+    } finally {
+      setSaving(false);
     }
   };
 
+  if (userLoading || saving) {
+    return (
+      <DashboardLayout>
+        <Spinner size="xl" m="auto" mt={20} />
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
-      <Box maxW="600px" mx="auto" mt={10}>
-        <Heading size="lg" mb={6}>
-          Post a New Property
-        </Heading>
+      <Box maxW="800px" mx="auto" p={6}>
+        <Heading mb={6}>{isEditMode ? "Edit Property" : "Post a New Property"}</Heading>
 
-        <VStack spacing={4} align="stretch">
-          <FormControl>
-            <FormLabel>Title</FormLabel>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-          </FormControl>
+        <Tabs variant="enclosed-colored" colorScheme="teal" isFitted>
+          <TabList mb={4}>
+            <Tab>Basic Info</Tab>
+            <Tab>Financials</Tab>
+            <Tab>Associates & Media</Tab>
+          </TabList>
+          <TabPanels>
+            {/* Basic Info */}
+            <TabPanel>
+              <VStack spacing={4} align="stretch">
+                <FormControl isRequired>
+                  <FormLabel>Title</FormLabel>
+                  <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+                </FormControl>
+                <FormControl isRequired>
+                  <FormLabel>Address</FormLabel>
+                  <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+                </FormControl>
+                <HStack spacing={4}>
+                  <FormControl>
+                    <FormLabel>Floor</FormLabel>
+                    <Input value={floor} onChange={(e) => setFloor(e.target.value)} />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>Suite</FormLabel>
+                    <Input value={suite} onChange={(e) => setSuite(e.target.value)} />
+                  </FormControl>
+                </HStack>
+              </VStack>
+            </TabPanel>
 
-          <FormControl>
-            <FormLabel>Location</FormLabel>
-            <Input value={location} onChange={(e) => setLocation(e.target.value)} />
-          </FormControl>
+            {/* Financials */}
+            <TabPanel>
+              <VStack spacing={4} align="stretch">
+                <FormControl isRequired>
+                  <FormLabel>Size (SF)</FormLabel>
+                  <NumberInput value={sizeSF} min={0} onChange={(_, v) => setSizeSF(v)}>
+                    <NumberInputField />
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
+                  </NumberInput>
+                </FormControl>
+                <FormControl isRequired>
+                  <FormLabel>Rent ($/SF/Yr)</FormLabel>
+                  <NumberInput
+                    value={rentPerSF}
+                    min={0}
+                    precision={2}
+                    onChange={(_, v) => setRentPerSF(v)}
+                  >
+                    <NumberInputField />
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
+                  </NumberInput>
+                </FormControl>
+                <HStack spacing={8} mt={4}>
+                  <VStack>
+                    <Text fontSize="sm" color="gray.500">Annual Rent</Text>
+                    <Text fontWeight="bold">${annualRent.toLocaleString()}</Text>
+                  </VStack>
+                  <VStack>
+                    <Text fontSize="sm" color="gray.500">Monthly Rent</Text>
+                    <Text fontWeight="bold">${monthlyRent.toLocaleString()}</Text>
+                  </VStack>
+                  <VStack>
+                    <Text fontSize="sm" color="gray.500">3-Yr GCI</Text>
+                    <Text fontWeight="bold">${gci3yrs.toLocaleString()}</Text>
+                  </VStack>
+                </HStack>
+              </VStack>
+            </TabPanel>
 
-          <FormControl>
-            <FormLabel>Price (USD)</FormLabel>
-            <Input
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-            />
-          </FormControl>
+            {/* Associates & Media */}
+            <TabPanel>
+              <VStack
+                spacing={6}
+                align="stretch"
+                divider={<StackDivider borderColor="gray.200" />}
+              >
+                <FormControl>
+                  <FormLabel>Broker Email</FormLabel>
+                  <Input
+                    type="email"
+                    value={brokerEmail}
+                    onChange={(e) => setBrokerEmail(e.target.value)}
+                  />
+                </FormControl>
+                {[assoc1, assoc2, assoc3, assoc4].map((val, i) => (
+                  <FormControl key={i}>
+                    <FormLabel>Associate {i + 1}</FormLabel>
+                    <Input
+                      value={val}
+                      onChange={(e) =>
+                        [setAssoc1, setAssoc2, setAssoc3, setAssoc4][i](e.target.value)
+                      }
+                    />
+                  </FormControl>
+                ))}
+                <FormControl>
+                  <FormLabel>Property Images</FormLabel>
+                  <Input type="file" accept="image/*" multiple onChange={handleFiles} />
+                </FormControl>
+              </VStack>
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
 
-          <FormControl>
-            <FormLabel>Description</FormLabel>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </FormControl>
-
-          <FormControl>
-            <FormLabel>Upload Image</FormLabel>
-            <Input type="file" accept="image/*" onChange={handleImageChange} />
-            {previewUrl && (
-              <Image src={previewUrl} alt="Preview" mt={2} borderRadius="md" />
-            )}
-          </FormControl>
-
-          <Button colorScheme="teal" onClick={handleSubmit}>
-            Submit
+        <Flex mt={6}>
+          <Spacer />
+          <Button colorScheme="teal" size="lg" onClick={handleSubmit} isLoading={saving}>
+            {isEditMode ? "Save Changes" : "Submit"}
           </Button>
-        </VStack>
+        </Flex>
       </Box>
     </DashboardLayout>
   );

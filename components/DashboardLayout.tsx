@@ -1,10 +1,11 @@
+// components/DashboardLayout.tsx
 import {
+  Flex,
   Box,
-  VStack,
   Heading,
+  VStack,
   Text,
   HStack,
-  Icon,
   useColorModeValue,
 } from "@chakra-ui/react";
 import {
@@ -15,92 +16,71 @@ import {
   FiHeart,
   FiUser,
 } from "react-icons/fi";
-import { useRouter } from "next/router";
-import React from "react";
+import Link from "next/link";
+import type { IconType } from "react-icons";
 
-const sidebarItems = [
-  { icon: FiHome, label: "Home", path: "/dashboard" },
-  { icon: FiSearch, label: "Browse", path: "/dashboard?showSearch=true" }, // search handled in dashboard
-  { icon: FiRadio, label: "Live Deals", path: "/live-deals" },
-  { section: "My Library" },
-  { icon: FiList, label: "My Listings", path: "/my-listings" },
-  { icon: FiHeart, label: "Matches", path: "/matches" },
-  { icon: FiUser, label: "Profile", path: "/profile" },
-];
+interface SidebarItemProps {
+  href: string;
+  icon: IconType;
+  label: string;
+}
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const bg = useColorModeValue("gray.50", "gray.900");
-
+function SidebarItem({ href, icon: Icon, label }: SidebarItemProps) {
   return (
-    <Box minH="100vh" bg={bg} display="flex">
-      {/* Sidebar */}
-      <Box w="250px" p={6} bg="black" color="white" minH="100vh">
-        <Heading size="md" mb={10} fontWeight="bold">
-          CREB.Ai
-        </Heading>
-        <VStack align="start" spacing={5} fontWeight="medium" width="100%">
-          {sidebarItems.map((item, index) =>
-            item.section ? (
-              <Text
-                key={index}
-                fontSize="sm"
-                color="gray.400"
-                mt={4}
-                width="100%"
-              >
-                {item.section}
-              </Text>
-            ) : (
-              <SidebarItem
-                key={index}
-                icon={item.icon}
-                label={item.label}
-                path={item.path}
-                isActive={router.pathname === item.path}
-                onClick={() =>
-                  item.label === "Browse"
-                    ? router.push("/dashboard?showSearch=true")
-                    : router.push(item.path)
-                }
-              />
-            )
-          )}
-        </VStack>
-      </Box>
-
-      {/* Main Content */}
-      <Box flex="1" p={10}>
-        {children}
-      </Box>
-    </Box>
+    <Link href={href} passHref>
+      <HStack
+        as="a"
+        spacing={3}
+        p={2}
+        borderRadius="md"
+        _hover={{ bg: "teal.600" }}
+        transition="background 0.2s"
+        cursor="pointer"
+      >
+        <Icon />
+        <Text>{label}</Text>
+      </HStack>
+    </Link>
   );
 }
 
-function SidebarItem({
-  icon,
-  label,
-  path,
-  isActive,
-  onClick,
+export default function DashboardLayout({
+  children,
 }: {
-  icon: any;
-  label: string;
-  path: string;
-  isActive?: boolean;
-  onClick?: () => void;
+  children: React.ReactNode;
 }) {
+  const bg = useColorModeValue("gray.50", "gray.900");
   return (
-    <HStack
-      spacing={3}
-      cursor="pointer"
-      onClick={onClick}
-      _hover={{ color: "teal.300" }}
-      color={isActive ? "teal.300" : "white"}
-      width="100%"
-    >
-      <Box as={icon} boxSize={5} />
-      <Text fontSize="md">{label}</Text>
-    </HStack>
+    <Flex h="100vh" overflow="hidden">
+      {/* Sidebar: never scrolls */}
+      <Box
+        w="250px"
+        bg="black"
+        color="white"
+        p={6}
+        flexShrink={0}
+      >
+        <Heading size="md" mb={8}>
+          CREB.Ai
+        </Heading>
+        <VStack align="start" spacing={4}>
+          <SidebarItem href="/dashboard" icon={FiHome} label="Home" />
+          <SidebarItem href="/dashboard?mode=browse" icon={FiSearch} label="Browse" />
+          <SidebarItem href="/live-deals" icon={FiRadio} label="Live Deals" />
+
+          <Text fontSize="sm" color="gray.400" mt={6}>
+            My Library
+          </Text>
+          <SidebarItem href="/my-listings" icon={FiList} label="My Listings" />
+          <SidebarItem href="/matches" icon={FiHeart} label="Matches" />
+          <SidebarItem href="/profile" icon={FiUser} label="Profile" />
+        </VStack>
+      </Box>
+
+      {/* Main: vertical scroll only */}
+      <Box flex="1" overflowY="auto" bg={bg}>
+        {children}
+      </Box>
+    </Flex>
   );
 }
