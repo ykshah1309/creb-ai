@@ -146,3 +146,68 @@ Dependencies Installed by npm install:
 
 That’s it! You should now be able to run and test CREB.Ai locally.
 
+📝 Changelog
+v1.1 (2025-07)
+Core Platform
+Redesigned dashboard for improved UX, with horizontally scrollable, animated property panels for My Listings, Other Properties, and Matches.
+
+Added modal popups for all property cards, including detailed info, “Like/Match,” “Reject,” and “Undo” actions.
+
+Improved rejection logic: rejected properties automatically reappear when the user runs out of new properties to view.
+
+Cards now feature smooth zoom-in hover animation and consistent, modern UI.
+
+Listings & Verification
+Verification Flow:
+
+Added “Request Verification” button to each listing on My Listings page.
+
+Property verification requests are now sent to the admin dashboard for approval.
+
+Admin can approve requests; verified listings show a verification badge.
+
+Enhanced My Listings with new card layout, property modals, and clear action buttons (Edit, Delete, View, Request Verification).
+
+Matching & Messaging
+Swipe-to-like/Match flow with instant match creation and updates via Supabase.
+
+Added Undo for rejected listings via the popup.
+
+Upgraded Matches page:
+
+Left pane for incoming likes and all accepted matches.
+
+Real-time chat for each match.
+
+Lease generation and contract e-sign built into chat.
+
+Profile & Auth
+Fully redesigned profile page with improved avatar handling and editable display name.
+
+Added Logout button to admin dashboard for secure session control.
+
+Admin Dashboard
+Admin-only analytics dashboard with rich charts and KPIs:
+
+Total users, listings, matches, rent analytics.
+
+Pie/Doughnut charts for property types/locations.
+
+Bar chart for user signups by month.
+
+Financial summary for quick business insights.
+
+Verification Requests:
+
+Admin panel shows all pending property verification requests with one-click approve flow.
+
+Only admin (by email) can see this page.
+
+Database & Demo Data
+DB Schema:
+
+Added verification_status (text) and is_verified (boolean) to properties table.
+
+Demo Data:
+
+Added SQL for diverse properties, matches, and users to populate the dashboard and analytics for demo purposes.
