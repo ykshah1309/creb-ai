@@ -9,18 +9,31 @@ import {
   Button,
   Box,
 } from "@chakra-ui/react";
-import SignatureCanvas from "react-signature-canvas";
-import { useRef } from "react";
+import dynamic from "next/dynamic";
+import React, { useRef } from "react";
 
-export default function SignContractModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const sigPad = useRef<any>();
+const SignatureCanvas = dynamic(() => import("react-signature-canvas"), { ssr: false });
 
-  const clear = () => sigPad.current.clear();
+export default function SignContractModal({
+  isOpen,
+  onClose,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const sigPadRef = useRef<any>(null);
+
+  const clear = () => sigPadRef.current && sigPadRef.current.clear();
 
   const save = () => {
-    const dataUrl = sigPad.current.getTrimmedCanvas().toDataURL("image/png");
-    console.log("Signature saved:", dataUrl);
-    onClose();
+    console.log("sigPadRef.current:", sigPadRef.current);
+    if (sigPadRef.current && typeof sigPadRef.current.getTrimmedCanvas === "function") {
+      const dataUrl = sigPadRef.current.getTrimmedCanvas().toDataURL("image/png");
+      console.log("Signature saved:", dataUrl);
+      onClose();
+    } else {
+      alert("Signature not ready! Try again in a second.");
+    }
   };
 
   return (
@@ -34,7 +47,7 @@ export default function SignContractModal({ isOpen, onClose }: { isOpen: boolean
             <SignatureCanvas
               penColor="black"
               canvasProps={{ width: 500, height: 200, className: "sigCanvas" }}
-              ref={sigPad}
+              ref={sigPadRef}
             />
           </Box>
         </ModalBody>
