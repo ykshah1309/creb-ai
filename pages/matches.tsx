@@ -1,4 +1,3 @@
-// pages/matches.tsx
 import {
   Box,
   Flex,
@@ -18,6 +17,11 @@ import {
   ModalFooter,
   VStack,
   HStack,
+  IconButton,
+  Avatar,
+  Divider,
+  Tooltip,
+  Image,
 } from "@chakra-ui/react";
 import NextLink from "next/link";
 import { useEffect, useState, useRef } from "react";
@@ -25,6 +29,7 @@ import { useRouter } from "next/router";
 import DashboardLayout from "@/components/DashboardLayout";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/lib/useUser";
+import { FiCheck, FiX, FiMessageSquare } from "react-icons/fi";
 import SignContractModal from "@/components/SignContractModal";
 
 type Match = {
@@ -55,13 +60,6 @@ type Message = {
   created_at: string;
 };
 
-type User = {
-  id: string;
-  name: string;
-  avatar_url: string | null;
-  email: string;
-};
-
 export default function MatchesPage() {
   const { user, loading: userLoading } = useUser();
   const toast = useToast();
@@ -81,12 +79,10 @@ export default function MatchesPage() {
   const [signModalOpen, setSignModalOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Scroll chat to bottom on new messages
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Load incoming & accepted matches + property data
   async function fetchMatches() {
     if (!user) return;
     setLoading(true);
@@ -119,7 +115,6 @@ export default function MatchesPage() {
     setLoading(false);
   }
 
-  // Fetch chat messages for a match
   async function fetchMessages(mid: string) {
     const { data } = await supabase
       .from<Message>("messages")
@@ -129,7 +124,6 @@ export default function MatchesPage() {
     setMessages(data || []);
   }
 
-  // Real-time message subscription
   useEffect(() => {
     if (!selectedMatch) return;
     const ch = supabase
@@ -144,10 +138,8 @@ export default function MatchesPage() {
     return () => { supabase.removeChannel(ch); };
   }, [selectedMatch]);
 
-  // Initial load
   useEffect(() => { if (user) fetchMatches(); }, [user]);
 
-  // Auto-select via URL
   useEffect(() => {
     if (matchId && accepted.length) {
       const m = accepted.find(x => x.id === matchId);
@@ -158,14 +150,12 @@ export default function MatchesPage() {
     }
   }, [matchId, accepted]);
 
-  // Switch chat thread
   function selectChat(m: Match) {
     setSelectedMatch(m);
     router.replace({ query: { matchId: m.id }}, undefined, { shallow: true });
     fetchMessages(m.id);
   }
 
-  // Send a chat message
   async function handleSend() {
     if (!user || !selectedMatch || !newMessage.trim()) return;
     await supabase.from("messages").insert({
@@ -176,7 +166,6 @@ export default function MatchesPage() {
     setNewMessage("");
   }
 
-  // Generate & send lease PDF
   async function generateLease() {
     if (!selectedMatch || !user) return;
     setGeneratingLease(true);
@@ -194,7 +183,6 @@ export default function MatchesPage() {
       toast({ title: "Error generating lease", description: body.error, status: "error" });
     } else {
       toast({ title: "Lease sent!", status: "success" });
-      // Once done, push to Live Deals
       router.push("/live-deals");
     }
 
@@ -212,119 +200,226 @@ export default function MatchesPage() {
 
   return (
     <DashboardLayout>
-      <Flex h="100%" minH="80vh">
-        {/* ─── Left Pane ───────────────────────────────────── */}
-        <Box w="300px" borderRight="1px solid" borderColor="gray.200" overflowY="auto">
-          <VStack p={4} align="stretch" spacing={4}>
-            <Heading size="md">Incoming Likes</Heading>
-            {incoming.length===0
-              ? <Text color="gray.500">No new likes</Text>
-              : incoming.map(m => (
-                  <HStack key={m.id} spacing={2}>
-                    <Button size="xs" colorScheme="green"
-                      onClick={async ()=>{
-                        await supabase.from("matches").update({status:"accepted"}).eq("id",m.id);
-                        fetchMatches();
-                      }}
-                    >✓</Button>
-                    <Button size="xs" colorScheme="red" variant="outline"
-                      onClick={async ()=>{
-                        await supabase.from("matches").update({status:"rejected"}).eq("id",m.id);
-                        fetchMatches();
-                      }}
-                    >✕</Button>
-                    <NextLink href={`/property/${m.property_id}`} passHref>
-                      <Text as="a" flex="1" noOfLines={1}>
-                        {properties[m.property_id]?.title||"—"}
-                      </Text>
-                    </NextLink>
-                  </HStack>
-                ))
-            }
+      <Flex h="100%" minH="85vh" bg={useColorModeValue("gray.50", "gray.900")}>
+        {/* Left Pane */}
+        <Box
+          w={{ base: "100%", md: "370px" }}
+          borderRight="1px solid"
+          borderColor={useColorModeValue("gray.200", "gray.800")}
+          py={0}
+          bg={useColorModeValue("white", "gray.900")}
+          minH="85vh"
+        >
+          <VStack p={4} align="stretch" spacing={6}>
+            <Box>
+              <Heading size="sm" mb={3}>Incoming Likes</Heading>
+              <VStack spacing={3} align="stretch">
+                {incoming.length === 0 ? (
+                  <Text color="gray.400" fontSize="sm">No new likes</Text>
+                ) : (
+                  incoming.map(m => {
+                    const prop = properties[m.property_id];
+                    return (
+                      <Flex
+                        key={m.id}
+                        align="center"
+                        bg={useColorModeValue("gray.100", "gray.800")}
+                        borderRadius="lg"
+                        px={3}
+                        py={2}
+                        boxShadow="sm"
+                        gap={3}
+                        _hover={{ boxShadow: "md" }}
+                        transition="box-shadow 0.15s"
+                      >
+                        {prop?.image_url && (
+                          <Image
+                            src={prop.image_url}
+                            alt={prop.title}
+                            boxSize="38px"
+                            borderRadius="md"
+                            objectFit="cover"
+                            mr={2}
+                          />
+                        )}
+                        <Box flex="1" minW={0}>
+                          <Text fontWeight="semibold" fontSize="sm" isTruncated>
+                            {prop?.title || "—"}
+                          </Text>
+                          <Text fontSize="xs" color="gray.400" isTruncated>
+                            {prop?.location || ""}
+                          </Text>
+                        </Box>
+                        <Tooltip label="Accept">
+                          <IconButton
+                            icon={<FiCheck />}
+                            size="sm"
+                            aria-label="Accept"
+                            colorScheme="teal"
+                            variant="outline"
+                            rounded="full"
+                            onClick={async () => {
+                              await supabase.from("matches").update({ status: "accepted" }).eq("id", m.id);
+                              fetchMatches();
+                            }}
+                          />
+                        </Tooltip>
+                        <Tooltip label="Reject">
+                          <IconButton
+                            icon={<FiX />}
+                            size="sm"
+                            aria-label="Reject"
+                            colorScheme="red"
+                            variant="outline"
+                            rounded="full"
+                            ml={1}
+                            onClick={async () => {
+                              await supabase.from("matches").update({ status: "rejected" }).eq("id", m.id);
+                              fetchMatches();
+                            }}
+                          />
+                        </Tooltip>
+                      </Flex>
+                    );
+                  })
+                )}
+              </VStack>
+            </Box>
 
-            <Heading size="md" mt={6}>Chats</Heading>
-            {accepted.length===0
-              ? <Text color="gray.500">No active chats</Text>
-              : accepted.map(m => (
-                  <Box key={m.id}
-                    p={2}
-                    borderRadius="md"
-                    bg={ selectedMatch?.id===m.id
-                          ? useColorModeValue("teal.50","teal.800")
-                          : undefined }
-                    cursor="pointer"
-                    onClick={()=> selectChat(m)}
-                  >
-                    {properties[m.property_id]?.title||"—"}
-                  </Box>
-                ))
-            }
+            <Divider my={2} />
+
+            <Box>
+              <Heading size="sm" mb={3}>Chats</Heading>
+              <VStack spacing={1} align="stretch">
+                {accepted.length === 0 ? (
+                  <Text color="gray.400" fontSize="sm">No active chats</Text>
+                ) : (
+                  accepted.map(m => {
+                    const prop = properties[m.property_id];
+                    return (
+                      <Flex
+                        key={m.id}
+                        align="center"
+                        px={2}
+                        py={2}
+                        bg={selectedMatch?.id === m.id ? "teal.50" : "transparent"}
+                        borderRadius="lg"
+                        cursor="pointer"
+                        _hover={{ bg: useColorModeValue("gray.100", "gray.800") }}
+                        onClick={() => selectChat(m)}
+                        transition="background 0.13s"
+                        gap={3}
+                      >
+                        <Avatar
+                          size="sm"
+                          name={prop?.title}
+                          src={prop?.image_url || undefined}
+                          mr={2}
+                        />
+                        <Box flex="1" minW={0}>
+                          <Text isTruncated fontWeight="medium" fontSize="sm">
+                            {prop?.title || "—"}
+                          </Text>
+                          <Text fontSize="xs" color="gray.400" isTruncated>
+                            {prop?.location}
+                          </Text>
+                        </Box>
+                        <FiMessageSquare color="#319795" />
+                      </Flex>
+                    );
+                  })
+                )}
+              </VStack>
+            </Box>
           </VStack>
         </Box>
 
-        {/* ─── Right Pane ─────────────────────────────────── */}
-        <Box flex="1" p={4} display="flex" flexDirection="column">
+        {/* Right Pane */}
+        <Box flex="1" p={6} display="flex" flexDirection="column" minW={0}>
           {selectedMatch ? (
             <>
-              <Heading size="md" mb={4}>
+              <Heading size="sm" mb={4}>
                 Chat — {properties[selectedMatch.property_id]?.title}
               </Heading>
 
-              <Box flex="1" overflowY="auto" mb={4}>
+              <Box
+                flex="1"
+                overflowY="auto"
+                mb={4}
+                px={2}
+                bg={useColorModeValue("white", "gray.900")}
+                borderRadius="lg"
+                boxShadow="sm"
+                py={4}
+                maxH="60vh"
+              >
                 {messages.map(msg => (
                   <Box key={msg.id}
-                    textAlign={ msg.sender===user!.id ? "right":"left" }
+                    textAlign={msg.sender === user!.id ? "right" : "left"}
                     mb={2}
                   >
-                    <Text as="span"
-                      bg={ msg.sender===user!.id ? "teal.500" : useColorModeValue("gray.200","gray.700") }
-                      color={ msg.sender===user!.id ? "white":undefined }
-                      px={3} py={1} borderRadius="md" display="inline-block"
+                    <Box
+                      as="span"
+                      bg={msg.sender === user!.id ? "teal.500" : useColorModeValue("gray.200", "gray.700")}
+                      color={msg.sender === user!.id ? "white" : undefined}
+                      px={3}
+                      py={2}
+                      borderRadius="xl"
+                      display="inline-block"
+                      fontSize="sm"
+                      maxW="70%"
+                      wordBreak="break-word"
+                      boxShadow={msg.sender === user!.id ? "md" : "sm"}
                     >
                       {msg.content}
-                    </Text>
+                    </Box>
                   </Box>
                 ))}
-                <div ref={chatEndRef}/>
+                <div ref={chatEndRef} />
               </Box>
 
-              <HStack mb={4}>
+              <HStack mt={2} mb={4}>
                 <Input
                   placeholder="Type your message…"
                   value={newMessage}
-                  onChange={e=>setNewMessage(e.target.value)}
+                  onChange={e => setNewMessage(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") handleSend(); }}
                 />
-                <Button colorScheme="teal" onClick={handleSend}>Send</Button>
+                <Button colorScheme="teal" px={6} onClick={handleSend}>Send</Button>
               </HStack>
 
               {/* Owner can draft lease */}
-              {user!.id===selectedMatch.to_user && (
-                <Button colorScheme="blue" onClick={()=>setLeaseModalOpen(true)}>
+              {user!.id === selectedMatch.to_user && (
+                <Button colorScheme="blue" mt={2} onClick={() => setLeaseModalOpen(true)}>
                   Generate & Send Lease
                 </Button>
               )}
 
               {/* Renter can sign */}
               {selectedMatch.contract_url &&
-                user!.id!==selectedMatch.to_user &&
+                user!.id !== selectedMatch.to_user &&
                 !selectedMatch.signature_url && (
-                  <Button colorScheme="teal" onClick={()=>setSignModalOpen(true)}>
+                  <Button colorScheme="teal" mt={2} onClick={() => setSignModalOpen(true)}>
                     Review & Sign Lease
                   </Button>
                 )}
             </>
           ) : (
-            <Text>Select a chat or incoming like to get started.</Text>
+            <Flex align="center" justify="center" height="100%">
+              <Text color="gray.500" fontSize="lg">
+                Select a chat or incoming like to get started.
+              </Text>
+            </Flex>
           )}
         </Box>
       </Flex>
 
       {/* Generate Lease Modal */}
-      <Modal isOpen={leaseModalOpen} onClose={()=>setLeaseModalOpen(false)}>
-        <ModalOverlay/>
+      <Modal isOpen={leaseModalOpen} onClose={() => setLeaseModalOpen(false)}>
+        <ModalOverlay />
         <ModalContent>
           <ModalHeader>Generate & Send Lease</ModalHeader>
-          <ModalCloseButton/>
+          <ModalCloseButton />
           <ModalBody>
             <Text>This will draft a 12-month lease PDF and send it into the chat.</Text>
           </ModalBody>
@@ -337,7 +432,7 @@ export default function MatchesPage() {
             >
               Generate & Send
             </Button>
-            <Button onClick={()=>setLeaseModalOpen(false)}>Cancel</Button>
+            <Button onClick={() => setLeaseModalOpen(false)}>Cancel</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
@@ -347,7 +442,7 @@ export default function MatchesPage() {
         <SignContractModal
           isOpen
           matchId={selectedMatch.id}
-          onClose={()=>{
+          onClose={() => {
             setSignModalOpen(false);
             fetchMatches();
           }}

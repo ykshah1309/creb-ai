@@ -1,4 +1,3 @@
-// pages/profile.tsx
 import {
   Box,
   Heading,
@@ -12,12 +11,18 @@ import {
   useToast,
   VStack,
   useColorModeValue,
+  Divider,
+  Fade,
+  HStack,
+  Link,
+  Icon,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useUser } from "@/lib/useUser";
 import { supabase } from "@/lib/supabaseClient";
+import { FiUser } from "react-icons/fi";
 
 interface Profile {
   name: string;
@@ -31,10 +36,10 @@ export default function ProfilePage() {
   const [name, setName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [saving, setSaving] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState("");
   const toast = useToast();
   const router = useRouter();
 
-  // Redirect to /auth if not logged in
   useEffect(() => {
     if (!user && !userLoading) {
       router.replace("/auth");
@@ -44,7 +49,6 @@ export default function ProfilePage() {
   // Load profile data from `users` table
   useEffect(() => {
     if (!user) return;
-
     (async () => {
       const { data, error } = await supabase
         .from<Profile>("users")
@@ -59,10 +63,15 @@ export default function ProfilePage() {
       setProfile(data);
       setName(data.name);
       setAvatarUrl(data.avatar_url || "");
+      setAvatarPreview(data.avatar_url || "");
     })();
   }, [user]);
 
-  // Handler to update profile
+  // Update preview when user edits URL
+  useEffect(() => {
+    setAvatarPreview(avatarUrl || "");
+  }, [avatarUrl]);
+
   const handleUpdate = async () => {
     if (!user) return;
     setSaving(true);
@@ -78,7 +87,6 @@ export default function ProfilePage() {
     setSaving(false);
 
     if (error) {
-      console.error("Error updating profile:", error);
       toast({
         title: "Update failed",
         description: error.message,
@@ -88,16 +96,16 @@ export default function ProfilePage() {
       });
     } else {
       toast({
-        title: "Profile updated",
+        title: "Profile updated!",
         status: "success",
-        duration: 3000,
+        duration: 2500,
         isClosable: true,
       });
       setProfile({ ...profile!, name, avatar_url: avatarUrl || null, email: profile!.email });
     }
   };
 
-  // Show loading spinner while user or profile is loading
+  // Loading
   if (userLoading || !profile) {
     return (
       <DashboardLayout>
@@ -108,66 +116,102 @@ export default function ProfilePage() {
 
   return (
     <DashboardLayout>
-      <Box
-        maxW="600px"
-        mx="auto"
-        mt={10}
-        p={6}
-        bg={useColorModeValue("white", "gray.700")}
-        borderRadius="lg"
-        boxShadow="lg"
-      >
-        <Heading mb={6}>Your Profile</Heading>
-        <VStack spacing={6} align="stretch">
-          {/* Avatar */}
-          <Box textAlign="center">
-            <Avatar
-              size="2xl"
-              src={avatarUrl || undefined}
-              name={profile.name}
-              mb={4}
-            />
-            <Text fontSize="sm" color="gray.500">
-              Update the URL below to change your avatar.
-            </Text>
-          </Box>
+      <Fade in={true}>
+        <Box
+          maxW="420px"
+          mx="auto"
+          mt={{ base: 8, md: 16 }}
+          p={{ base: 4, md: 8 }}
+          bg={useColorModeValue("white", "gray.800")}
+          borderRadius="2xl"
+          boxShadow="xl"
+        >
+          <HStack spacing={3} mb={3}>
+            <Icon as={FiUser} boxSize={8} color="teal.400" />
+            <Heading size="lg" fontWeight="extrabold" bgClip="text" bgGradient="linear(to-r, teal.400, blue.400)">
+              My Profile
+            </Heading>
+          </HStack>
+          <Text color="gray.500" mb={6}>
+            Manage your info and personalize your account.
+          </Text>
+          <VStack spacing={6} align="stretch">
+            {/* Avatar with URL preview */}
+            <Box textAlign="center">
+              <Avatar
+                size="2xl"
+                src={avatarPreview || undefined}
+                name={name || profile.name}
+                mb={3}
+                boxShadow="md"
+              />
+              <Text fontSize="sm" color="gray.400" mb={2}>
+                Need an avatar? Try{" "}
+                <Link color="teal.500" isExternal href="https://dicebear.com/">DiceBear</Link>
+                {" "}or{" "}
+                <Link color="teal.500" isExternal href="https://gravatar.com/">Gravatar</Link>
+              </Text>
+              <Divider my={2} />
+            </Box>
 
-          {/* Name Field */}
-          <FormControl>
-            <FormLabel>Display Name</FormLabel>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your display name"
-            />
-          </FormControl>
+            {/* Name Field */}
+            <FormControl>
+              <FormLabel fontWeight="semibold">Display Name</FormLabel>
+              <Input
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Your display name"
+                borderRadius="xl"
+                fontWeight="medium"
+              />
+            </FormControl>
 
-          {/* Avatar URL Field */}
-          <FormControl>
-            <FormLabel>Avatar URL</FormLabel>
-            <Input
-              value={avatarUrl}
-              onChange={(e) => setAvatarUrl(e.target.value)}
-              placeholder="https://..."
-            />
-          </FormControl>
+            {/* Avatar URL Field */}
+            <FormControl>
+              <FormLabel fontWeight="semibold">Avatar URL</FormLabel>
+              <Input
+                value={avatarUrl}
+                onChange={e => setAvatarUrl(e.target.value)}
+                placeholder="https://..."
+                borderRadius="xl"
+              />
+              {avatarUrl && !avatarPreview && (
+                <Text color="red.400" fontSize="xs" mt={1}>
+                  Invalid image link.
+                </Text>
+              )}
+            </FormControl>
 
-          {/* Email (read-only) */}
-          <FormControl>
-            <FormLabel>Email</FormLabel>
-            <Input value={profile.email} isReadOnly />
-          </FormControl>
+            {/* Email (read-only) */}
+            <FormControl>
+              <FormLabel fontWeight="semibold">Email</FormLabel>
+              <Input
+                value={profile.email}
+                isReadOnly
+                borderRadius="xl"
+                bg={useColorModeValue("gray.100", "gray.700")}
+                fontWeight="medium"
+                color="gray.500"
+              />
+            </FormControl>
 
-          {/* Save Button */}
-          <Button
-            colorScheme="teal"
-            onClick={handleUpdate}
-            isLoading={saving}
-          >
-            Save Changes
-          </Button>
-        </VStack>
-      </Box>
+            <Button
+              colorScheme="teal"
+              size="lg"
+              fontWeight="bold"
+              borderRadius="xl"
+              boxShadow="md"
+              isLoading={saving}
+              onClick={handleUpdate}
+              mt={2}
+              _hover={{ transform: "translateY(-2px)", boxShadow: "lg" }}
+              transition="all 0.18s"
+            >
+              Save Changes
+            </Button>
+          </VStack>
+        </Box>
+      </Fade>
     </DashboardLayout>
   );
 }

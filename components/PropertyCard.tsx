@@ -1,90 +1,94 @@
-// components/PropertyCard.tsx
-import {
-  LinkBox,
-  LinkOverlay,
-  Box,
-  Image,
-  Heading,
-  Text,
-  Button,
-  useToast,
-  useColorModeValue,
-} from "@chakra-ui/react";
-import NextLink from "next/link";
-import { useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import { useUser } from "@/lib/useUser";
+import { Box, Text, Heading, Badge, Image, HStack } from "@chakra-ui/react";
+import { motion } from "framer-motion";
+import { FiMapPin } from "react-icons/fi";
 
-export default function PropertyCard({ property }) {
-  const { user } = useUser();
-  const toast = useToast();
-  const [loading, setLoading] = useState(false);
-  const [liked, setLiked] = useState(false);
+const MotionBox = motion(Box);
 
-  const handleLike = async () => {
-    if (!user) {
-      toast({ title: "Please sign in first", status: "warning" });
-      return;
-    }
-    setLoading(true);
-    const { error } = await supabase
-      .from("matches")
-      .insert({
-        from_user: user.id,
-        to_user: property.owner_id,
-        property_id: property.id,
-      });
-    setLoading(false);
-
-    if (error) {
-      toast({ title: "Error liking", description: error.message, status: "error" });
-    } else {
-      setLiked(true);
-      toast({ title: "Property liked!", status: "success" });
-    }
-  };
-
-  const bg = useColorModeValue("white", "gray.800");
-
+export default function PropertyCard({
+  property,
+  highlight,
+  badgeText,
+  onClick,
+  children,
+}: {
+  property: any;
+  highlight?: boolean;
+  badgeText?: string;
+  onClick?: () => void;
+  children?: React.ReactNode;
+}) {
   return (
-    <LinkBox bg={bg} borderRadius="xl" boxShadow="md" overflow="hidden">
-      <NextLink href={`/property/${property.id}`} passHref>
-        <LinkOverlay>
-          <Image
-            src={property.image_url || "/placeholder.png"}
-            alt={property.title}
-            h="160px"
-            w="100%"
-            objectFit="cover"
-          />
-          <Box p={4}>
-            <Heading size="md">{property.title}</Heading>
-            <Text color="gray.600" fontSize="sm">
-              {property.location}
-            </Text>
-            <Text color="green.500" fontWeight="semibold">
-              ${property.price.toLocaleString()}
-            </Text>
-            <Text noOfLines={2} mt={2} fontSize="sm" color="gray.700">
-              {property.description}
-            </Text>
-          </Box>
-        </LinkOverlay>
-      </NextLink>
-
-      {user?.id !== property.owner_id && (
-        <Box p={4}>
-          <Button
-            isFullWidth
-            colorScheme="teal"
-            onClick={handleLike}
-            isLoading={loading}
-            disabled={liked}
+    <MotionBox
+      whileHover={{
+        scale: 1.045,
+        boxShadow: "0 8px 32px #1ad7ff66",
+        y: -8,
+        zIndex: 10,
+      }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: "spring", stiffness: 200, damping: 16 }}
+      borderRadius="2xl"
+      bg="white"
+      boxShadow={highlight ? "0 0 16px 2px #1ad7ff99" : "md"}
+      minW={["240px", "320px"]}
+      maxW={["260px", "360px"]}
+      p={0}
+      overflow="hidden"
+      cursor="pointer"
+      position="relative"
+      onClick={onClick}
+      role="group"
+    >
+      {/* Property Image */}
+      <Box h="160px" w="100%" bg="gray.100" position="relative">
+        <Image
+          src={property.image_url || "/no-image.jpg"}
+          alt={property.title}
+          objectFit="cover"
+          w="100%"
+          h="100%"
+          borderTopRadius="2xl"
+          transition="0.2s"
+          _groupHover={{ filter: "brightness(0.93)" }}
+        />
+        {/* Status badge */}
+        {(highlight || badgeText) && (
+          <Badge
+            colorScheme={highlight ? "teal" : "gray"}
+            position="absolute"
+            top={3}
+            right={3}
+            fontSize="0.95em"
+            px={3}
+            py={1}
+            borderRadius="xl"
+            shadow="md"
           >
-            {liked ? "Liked" : "Like this property"}
-          </Button>
-        </Box>
-      )}
-    </LinkBox>
+            {badgeText || "Matched"}
+          </Badge>
+        )}
+      </Box>
+      {/* Info */}
+      <Box px={5} pt={4} pb={children ? 0 : 4}>
+        <Heading fontSize="xl" mb={1} noOfLines={2}>
+          {property.title}
+        </Heading>
+        <HStack spacing={2} color="gray.500" fontSize="sm" mb={2}>
+          <Box as={FiMapPin} /> <Text>{property.location || "—"}</Text>
+        </HStack>
+        <Text color="teal.500" fontWeight="bold" fontSize="lg" mb={1}>
+          {property.price
+            ? "$" +
+              property.price.toLocaleString(undefined, {
+                maximumFractionDigits: 0,
+              })
+            : ""}
+        </Text>
+        <Text fontSize="sm" color="gray.600" noOfLines={2}>
+          {property.description}
+        </Text>
+        {children}
+      </Box>
+    </MotionBox>
   );
 }
