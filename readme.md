@@ -2,84 +2,113 @@
 
 **CREB.Ai** is the first Tinder-style, AI-driven web platform for Commercial Real Estate (CRE). We make it effortless for buyers, sellers, and brokers to connect, negotiate, and close CRE deals—faster and smarter than ever.
 
-[User-Side Demo Video Link](https://drive.google.com/file/d/1bZ9EH54e9UQ8XkcSmhKRtkgeRvQE8mDb/view?usp=sharing)
-
-[Admin-Side Demo Video Link](https://drive.google.com/file/d/1jqdzbQGxXbpMcHkCGqiFTaHasMMw2xJ6/view?usp=sharing)
+[User-Side Demo Video](https://drive.google.com/file/d/1bZ9EH54e9UQ8XkcSmhKRtkgeRvQE8mDb/view?usp=sharing)  
+[Admin-Side Demo Video](https://drive.google.com/file/d/1jqdzbQGxXbpMcHkCGqiFTaHasMMw2xJ6/view?usp=sharing)
 
 ---
 
 ## 🚀 What Makes CREB.Ai Unique?
 
-- **Swipe to Match:** Instantly match with properties and interested parties, just like dating apps—no more cold calls or missed leads.
-- **AI Lease Agent:** Built-in AI assistant answers your questions and helps generate lease contracts, reducing legal headaches and manual paperwork.
-- **Real-Time Chat:** Secure, real-time messaging the moment a match happens—deal directly, negotiate, and collaborate.
-- **Automated Contracts & E-sign:** Generate, share, and sign NYC-compliant leases right within the platform—no extra tools needed.
-- **One Platform, All Roles:** Designed for buyers, owners, and brokers with custom flows for each user type.
+- **Swipe to Match:** Instantly match with properties and interested parties, just like dating apps.
+- **AI Lease Agent:** Built-in AI assistant to answer questions and generate lease contracts.
+- **Real-Time Chat:** Secure messaging as soon as a match happens—negotiate, collaborate, close.
+- **Automated Contracts & E-sign:** NYC-compliant leases generated and signed in-platform.
+- **All Roles, One Platform:** Custom flows for buyers, owners, and brokers.
 
 ---
 
 ## 🏆 Why CREB.Ai Is the Only Solution You Need
 
-- **Cuts CRE deal time from weeks to hours**—AI speeds up every step, from finding the right match to signing the contract.
-- **Eliminates inefficiency:** No more long email chains, phone tag, or paperwork errors.
-- **Levels the playing field:** AI helps small owners/brokers close deals like industry giants.
+- **Cuts deal time from weeks to hours**—AI and automation at every step.
+- **No inefficiency:** End endless emails, calls, and paperwork errors.
+- **Small teams win:** AI levels the playing field for smaller owners/brokers.
 
 ---
 
 ## 🔥 Key Features
 
-- **AI Chatbot:** Built using a local LLM (OpenAI-compatible, privacy-first).
-- **Smart Matching:** Only see properties or users that fit your preferences.
-- **Secure, Real-Time Chat:** Every match gets a private chat room.
-- **Property Management:** Upload, edit, and manage your listings with ease.
-- **Contract Generation:** Auto-fill lease templates; review, edit, and e-sign securely.
-- **Activity Dashboard:** Track all your listings, matches, and active deals in one place.
+- **AI Chatbot** (privacy-first, OpenAI-compatible)
+- **Smart Matching** (custom logic)
+- **Real-Time Messaging**
+- **One-Click Lease Generation & E-Sign**
+- **Property Management** (upload, edit, verify)
+- **Business Analytics** (admin dashboard)
+- **Verification Workflow** (increase trust)
 
 ---
 
 ## 💡 How It Works
 
-1. **Sign Up & Create Profile**  
-   Select your role (Buyer, Seller, Broker), set your preferences.
-
-2. **Browse & Swipe**  
-   Like/dislike properties; owners/brokers see interested buyers instantly.
-
-3. **Get Matched**  
-   Mutual interest? Start chatting instantly.
-
-4. **AI Lease Agent**  
-   Ask the AI questions, generate leases, get instant support.
-
-5. **Close the Deal**  
-   Auto-generate a NYC-compliant lease and e-sign—all in-platform.
+1. **Sign Up & Create Profile**: Select your role, set your preferences.
+2. **Browse & Swipe**: Like/dislike properties—owners/brokers see interested buyers instantly.
+3. **Get Matched**: Mutual likes open a real-time chat.
+4. **AI Lease Agent**: Generate leases or get instant support from AI.
+5. **Close the Deal**: E-sign the lease, all in one place.
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Frontend:** Next.js, TypeScript, Tailwind CSS
+- **Frontend:** Next.js, TypeScript, Chakra UI, Tailwind CSS
 - **Backend:** Node.js (API routes), Supabase (Auth & DB)
 - **Database:** PostgreSQL (Supabase)
-- **AI Engine:** Local LLM (Qwen 2.5 VL-7b) via LM Studio, OpenAI-compatible API
-- **E-Signature:** Built-in contract generation & PDF support
+- **AI Engine:** Local LLM (Qwen 2.5 VL-7b) via LM Studio or OpenAI-compatible API
+- **E-Signature:** Built-in PDF and contract workflows
 
 ---
 
 ## ⚡ Database Schema (Simplified)
 
-- **users:** All platform users (auth, profile)
-- **properties:** Listings with images, specs, owner/broker info
-- **matches:** Tracks interest and deal status between users and properties
-- **messages:** Real-time chat for matched users
-- **ai_chat_history:** Logs user-AI conversations
+- **users:** Auth & profile
+- **properties:** Listings with owner/broker info, images, verification status
+- **matches:** Like/match status between users/properties
+- **messages:** Real-time chat between matches
+- **ai_chat_history:** User-AI interactions
+
 ![Database Schema Diagram](https://github.com/ykshah1309/creb-ai/blob/main/db_schema.png)
+
+---
+
+## 📝 Changelog
+
+### v1.1 (2025-07)
+
+#### Core Platform
+- Dashboard UI overhaul: Scrollable, animated panels for listings and matches
+- Instant property detail modals: Like/Match, Reject, Undo—all in place
+- Smarter rejection: See previously rejected properties again when new ones run out
+
+#### Listings & Verification
+- “Request Verification” button for every user listing
+- Admin dashboard: Approve verification requests, show verified badge instantly
+- Improved property management UI (edit/delete/view/verify)
+
+#### Matching & Messaging
+- Swipe-to-match and instant match creation
+- Real-time chat, lease generation, e-signature built in
+- Undo for rejected listings
+
+#### Profile & Auth
+- Redesigned profile page: avatar and display name editing
+- Admin logout button for secure sessions
+
+#### Admin Dashboard & Analytics
+- Full analytics: User growth, listings, matches, revenue, and KPIs
+- Live charts: user signups, listings by type/location
+- Quick financial summary
+- Admin-only panel for approving property verification requests
+
+#### Database & Demo Data
+- Added `verification_status` and `is_verified` to `properties`
+- Included demo data for properties, users, matches to populate analytics
+
+> For earlier changes, see repo history.
 
 ---
 
 ## 🚨 Why CREB.Ai Wins
 
-CREB.Ai brings the power of AI to CRE, making the process as easy as swiping right. No other platform offers real-time matching, negotiation, and AI lease generation in one seamless package. It's fast, smart, and built for the future of real estate.
+CREB.Ai brings AI to CRE, making the process as easy as swiping right. No other platform offers real-time matching, negotiation, and AI-powered lease generation in one place. It's fast, smart, and trust-driven.
 
 ---
 
@@ -146,68 +175,36 @@ Dependencies Installed by npm install:
 
 That’s it! You should now be able to run and test CREB.Ai locally.
 
-📝 Changelog
-v1.1 (2025-07)
-Core Platform
-Redesigned dashboard for improved UX, with horizontally scrollable, animated property panels for My Listings, Other Properties, and Matches.
+## 📝 Changelog
 
-Added modal popups for all property cards, including detailed info, “Like/Match,” “Reject,” and “Undo” actions.
+### v1.1 (2025-07)
 
-Improved rejection logic: rejected properties automatically reappear when the user runs out of new properties to view.
+#### Core Platform
+- Dashboard UI overhaul: Horizontally scrollable, animated panels for listings and matches.
+- Property popups: Instantly view details, like, reject, or undo—no page reloads.
+- Smart rejection logic: Rejected listings reappear when new matches run out.
 
-Cards now feature smooth zoom-in hover animation and consistent, modern UI.
+#### Listings & Verification
+- “Request Verification” button for all user listings.
+- Admin dashboard: Review and approve verification requests. Verified badge appears instantly.
+- Improved property management: Cleaner card layout, intuitive edit/delete/view/verify actions.
 
-Listings & Verification
-Verification Flow:
+#### Matching & Messaging
+- Swipe-to-match for all users.
+- Instant match creation, undo for rejections, and chat opens automatically.
+- Real-time chat, lease generation, and e-signature in every match.
 
-Added “Request Verification” button to each listing on My Listings page.
+#### Profile & Auth
+- Redesigned profile page with live avatar updates and editable display name.
+- Secure logout from admin panel.
 
-Property verification requests are now sent to the admin dashboard for approval.
+#### Admin Dashboard & Analytics
+- Full analytics for business ops: User growth, property/match KPIs, location/type breakdowns.
+- Live charts (bar, pie, doughnut) for user signups, listings by location/type, and revenue stats.
+- Financial summary at a glance.
 
-Admin can approve requests; verified listings show a verification badge.
+#### Database & Demo Data
+- DB: Added `verification_status` and `is_verified` to properties for verification workflows.
+- Included demo data for properties, users, and matches to power the dashboard and analytics.
 
-Enhanced My Listings with new card layout, property modals, and clear action buttons (Edit, Delete, View, Request Verification).
-
-Matching & Messaging
-Swipe-to-like/Match flow with instant match creation and updates via Supabase.
-
-Added Undo for rejected listings via the popup.
-
-Upgraded Matches page:
-
-Left pane for incoming likes and all accepted matches.
-
-Real-time chat for each match.
-
-Lease generation and contract e-sign built into chat.
-
-Profile & Auth
-Fully redesigned profile page with improved avatar handling and editable display name.
-
-Added Logout button to admin dashboard for secure session control.
-
-Admin Dashboard
-Admin-only analytics dashboard with rich charts and KPIs:
-
-Total users, listings, matches, rent analytics.
-
-Pie/Doughnut charts for property types/locations.
-
-Bar chart for user signups by month.
-
-Financial summary for quick business insights.
-
-Verification Requests:
-
-Admin panel shows all pending property verification requests with one-click approve flow.
-
-Only admin (by email) can see this page.
-
-Database & Demo Data
-DB Schema:
-
-Added verification_status (text) and is_verified (boolean) to properties table.
-
-Demo Data:
-
-Added SQL for diverse properties, matches, and users to populate the dashboard and analytics for demo purposes.
+> For previous updates, see repo history.
