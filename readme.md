@@ -65,7 +65,7 @@
 - **messages:** Real-time chat between matches
 - **ai_chat_history:** User-AI interactions
 
-![Database Schema Diagram](https://github.com/ykshah1309/creb-ai/blob/main/db_schema.png)
+![Database Schema Diagram]([https://github.com/ykshah1309/creb-ai/blob/main/db_schema.png](https://github.com/ykshah1309/creb-ai/blob/main/supabase-schema-btqyiwaezcfxgtpzwiwv%20(2).png))
 
 ---
 
